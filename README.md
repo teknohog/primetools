@@ -24,8 +24,9 @@ like this:
 
      CMD="motherfaktor.py -u teknohog -p salakalasana -n 2 -e 71 -gs"
      while true; do
-         if [ -n "`$CMD | grep -i fail`" ]; then exit; fi
+         if [ -n "`$CMD | grep -i fail`" ]; then break; fi
          ./mfakto -d $DEVICE
+	 sync
      done
 
 The script is self-documenting with motherfaktor.py -h and the design
@@ -40,3 +41,13 @@ http://mersenneforum.org/showthread.php?t=15646
 
 http://mersenneforum.org/mfakto/
 
+Plans/TODO/issues:
+------------------
+
+* When submitting soon after mfakto exits, the script sometimes only
+  sends partial results. Maybe it just needs a sync first...
+
+* We should take control of mfakto to enable file operations without a
+  full restart. Perhaps something as simple as process stop and resume
+  could work. It would be nicer to keep the work cache rather full all
+  the time.
