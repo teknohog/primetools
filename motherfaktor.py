@@ -90,7 +90,7 @@ def get_assignment():
         num_to_get = num_topup(tasks[0], int(options.num_cache))
         for i in range(num_to_get):
             if len(tasks[1]) > 0:
-                tasks[0].append(tasks[1].pop())
+                tasks[0].append(tasks[1].pop(0))
 
         for i in [0, 1]:
             write_list_file(workfile[i], tasks[i])
