@@ -45,7 +45,8 @@ def ReadLines(file):
     File.close()
     return map(lambda x: x.rstrip(), contents)
 
-def WriteFile(filename, content):
+def write_list_file(filename, l):
+    content = "\n".join(l) + "\n"
     File = open(filename, "w")
     File.write(content)
     File.close()
@@ -70,7 +71,7 @@ def get_assignment():
             task = s.groups()[0]
             tasks.append(exp_increase(task, int(options.max_exp)))
 
-    WriteFile(workfile, "\n".join(tasks))
+    write_list_file(workfile, tasks)
 
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
@@ -112,8 +113,8 @@ def submit_work():
             sent.append(line)
             results_copy.remove(line)
 
-    WriteFile(resultsfile, "\n".join(results_copy))
-    WriteFile(sentfile, "\n".join(sent))
+    write_list_file(resultsfile, results_copy)
+    write_list_file(sentfile, sent)
 
 from optparse import OptionParser
 parser = OptionParser()
