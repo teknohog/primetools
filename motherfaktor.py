@@ -144,7 +144,7 @@ def submit_work():
         data = "\n".join(sendgroup[mersenne])
         
         if options.debug:
-            print("Submitting" + data)
+            print("Submitting\n" + data)
 
         r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
         if "Processing result" in r.read():
