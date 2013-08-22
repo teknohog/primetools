@@ -141,7 +141,12 @@ def submit_work():
             results_copy.remove(line)
 
     for mersenne in sendgroup:
-        r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup("\n".join(sendgroup[mersenne])) + "&B1=Submit")
+        data = "\n".join(sendgroup[mersenne])
+        
+        if options.debug:
+            print("Submitting" + data)
+
+        r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
         if "Processing result" in r.read():
             sent += sendgroup[mersenne]
             for line in sendgroup[mersenne]:
@@ -155,11 +160,13 @@ def submit_work():
 from optparse import OptionParser
 parser = OptionParser()
 
+parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="Display debugging info")
+
 parser.add_option("-e", "--exp", dest="max_exp", default="0", help="Upper limit of exponent, to optionally replace the assigned one")
 
 parser.add_option("-u", "--username", dest="username", help="Your Primenet user name")
 parser.add_option("-p", "--password", dest="password", help="Your Primenet password")
-parser.add_option("-d", "--dir", dest="basedir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
+parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 
@@ -169,13 +176,13 @@ parser.add_option("-s", "--submit", action="store_true", dest="submit_work", def
 
 (options, args) = parser.parse_args()
 
-basedir = os.path.expanduser(options.basedir)
+workdir = os.path.expanduser(options.workdir)
 
-workfile = os.path.join(basedir, "worktodo.txt")
-resultsfile = os.path.join(basedir, "results.txt")
+workfile = os.path.join(workdir, "worktodo.txt")
+resultsfile = os.path.join(workdir, "results.txt")
 
 # A cumulative backup
-sentfile = os.path.join(basedir, "results_sent.txt")
+sentfile = os.path.join(workdir, "results_sent.txt")
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 cj = cookielib.CookieJar()
