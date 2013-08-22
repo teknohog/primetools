@@ -26,13 +26,16 @@ def cleanup(data):
     output = re.sub("\n", "%0A", output)
     return output
 
-def exp_increase(line, max_exp):
-    # Increase the upper limit to max_exp
-    s = re.search(r",([0-9]+)$", line)
-    if s:
-        exp = int(s.groups()[0])
-        new_exp = str(max(exp, max_exp))
-        return re.sub(r",([0-9]+)$", "," + new_exp, line)
+def exp_increase(l, max_exp):
+    output = []
+    for line in l:
+        # Increase the upper limit to max_exp
+        s = re.search(r",([0-9]+)$", line)
+        if s:
+            exp = int(s.groups()[0])
+            new_exp = str(max(exp, max_exp))
+            output.append(re.sub(r",([0-9]+)$", "," + new_exp, line))
+    return output
 
 def greplike(pattern, l):
     output = []
@@ -54,6 +57,11 @@ def ReadLines(file):
     File.close()
     return map(lambda x: x.rstrip(), contents)
 
+def num_topup(l, targetsize):
+    num_existing = len(l)
+    num_needed = targetsize - num_existing
+    return max(num_needed, 0)
+
 def write_list_file(filename, l):
     content = "\n".join(l) + "\n"
     File = open(filename, "w")
@@ -69,14 +77,38 @@ def get_assignment():
 
     pattern = r"Factor=.*"
 
-    if os.path.exists(workfile):
-        tasks = ReadLines(workfile)
-    else:
-        tasks = []
+    tasks = [[]]*2
 
-    # Don't overfill the work cache
-    num_old_tasks = len(greplike(pattern, tasks))
-    num_to_get = int(options.num_cache) - num_old_tasks
+    if os.path.exists(workfile[0]):
+        tasks[0] = greplike(pattern, ReadLines(workfile[0]))
+    else:
+        tasks[0] = []
+
+    # First top up l1 cache from l2 if possible, no matter what options
+    if os.path.exists(workfile[1]):
+        tasks[1] = ReadLines(workfile[1])
+        num_to_get = num_topup(tasks[0], int(options.num_cache))
+        for i in range(num_to_get):
+            if len(tasks[1]) > 0:
+                tasks[0].append(tasks[1].pop())
+
+        for i in [0, 1]:
+            write_list_file(workfile[i], tasks[i])
+    else:
+        # Only needed if l2 activated in the following stage, but
+        # simplifies overall code
+        tasks[1] = []
+
+    # Then fetch from network to the desired cache level
+    if int(options.l2cache) > 0:
+        level = 1
+        cachesize = options.l2cache
+    else:
+        level = 0
+        cachesize = options.num_cache
+
+    num_to_get = num_topup(tasks[level], int(cachesize))
+
     if num_to_get < 1:
         print("Cache full, not getting new work")
         return
@@ -89,19 +121,23 @@ def get_assignment():
                   "exp_hi": "",
               }
 
-    r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-    
-    for task in greplike(pattern, r.readlines()):
-        tasks.append(exp_increase(task, int(options.max_exp)))
+    if options.debug:
+        print("Fetching " + str(num_to_get) + " assignments")
 
-    write_list_file(workfile, tasks)
+    try:
+        r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+        tasks[level] += exp_increase(greplike(pattern, r.readlines()), int(options.max_exp))
+    except:
+        print("Fetch failed")
+
+    write_list_file(workfile[level], tasks[level])
 
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
     
-    if os.path.exists(workfile):
-        work = ReadFile(workfile)
+    if os.path.exists(workfile[0]):
+        work = ReadFile(workfile[0])
     else:
         work = ""
 
@@ -146,12 +182,15 @@ def submit_work():
         if options.debug:
             print("Submitting\n" + data)
 
-        r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-        if "Processing result" in r.read():
-            sent += sendgroup[mersenne]
-            for line in sendgroup[mersenne]:
-                results_copy.remove(line)
-        else:
+        try:
+            r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
+            if "Processing result" in r.read():
+                sent += sendgroup[mersenne]
+                for line in sendgroup[mersenne]:
+                    results_copy.remove(line)
+            else:
+                print("Submission failed.")
+        except:
             print("Submission failed.")
 
     write_list_file(resultsfile, results_copy)
@@ -170,6 +209,8 @@ parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working 
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 
+parser.add_option("-l", "--l2cache", dest="l2cache", default="0", help="Level 2 (offline) work cache size, default 0")
+
 parser.add_option("-g", "--getwork", action="store_true", dest="get_assignment", default=False, help="Get new assignments")
 
 parser.add_option("-s", "--submit", action="store_true", dest="submit_work", default=False, help="Submit completed work")
@@ -178,7 +219,9 @@ parser.add_option("-s", "--submit", action="store_true", dest="submit_work", def
 
 workdir = os.path.expanduser(options.workdir)
 
-workfile = os.path.join(workdir, "worktodo.txt")
+workfile = [os.path.join(workdir, "worktodo.txt"),
+            os.path.join(workdir, "l2cache.txt")]
+
 resultsfile = os.path.join(workdir, "results.txt")
 
 # A cumulative backup
