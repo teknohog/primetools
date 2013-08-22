@@ -37,5 +37,6 @@ Some of the ideas are adapted from http://www.gpu72.com/spider/.
 More on mfakto:
 
 http://mersenneforum.org/showthread.php?t=15646
+
 http://mersenneforum.org/mfakto/
 
