@@ -33,6 +33,14 @@ def exp_increase(line, max_exp):
         new_exp = str(max(exp, max_exp))
         return re.sub(r",([0-9]+)$", "," + new_exp, line)
 
+def greplike(pattern, l):
+    output = []
+    for line in l:
+        s = re.search(r".*(" + pattern +")$", line)
+        if s:
+            output.append(s.groups()[0])
+    return output
+
 def ReadFile(file):
     File = open(file, "r")
     contents = File.read()
@@ -56,20 +64,34 @@ import urllib2
 import re
 
 def get_assignment():
-    r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-
     # Parse Factor= lines, add new tasks at the end of workfile
+
+    pattern = r"Factor=.*"
 
     if os.path.exists(workfile):
         tasks = ReadLines(workfile)
     else:
         tasks = []
 
-    for line in r.readlines():
-        s = re.search(r".*(Factor=.*)$", line)
-        if s:
-            task = s.groups()[0]
-            tasks.append(exp_increase(task, int(options.max_exp)))
+    # Don't overfill the work cache
+    num_old_tasks = len(greplike(pattern, tasks))
+    num_to_get = int(options.num_cache) - num_old_tasks
+    if num_to_get < 1:
+        print("Cache full, not getting new work")
+        return
+
+    # Manual assignment settings; trial factoring = 2
+    assignment = {"cores": "1",
+                  "num_to_get": str(num_to_get),
+                  "pref": "2",
+                  "exp_lo": "",
+                  "exp_hi": "",
+              }
+
+    r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+    
+    for task in greplike(pattern, r.readlines()):
+        tasks.append(exp_increase(task, int(options.max_exp)))
 
     write_list_file(workfile, tasks)
 
@@ -125,7 +147,7 @@ parser.add_option("-u", "--username", dest="username", help="Your Primenet user 
 parser.add_option("-p", "--password", dest="password", help="Your Primenet password")
 parser.add_option("-d", "--dir", dest="basedir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
 
-parser.add_option("-n", "--num_to_get", dest="num_to_get", default="1", help="Number of assignments, default 1")
+parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 
 parser.add_option("-g", "--getwork", action="store_true", dest="get_assignment", default=False, help="Get new assignments")
 
@@ -140,14 +162,6 @@ resultsfile = os.path.join(basedir, "results.txt")
 
 # A cumulative backup
 sentfile = os.path.join(basedir, "results_sent.txt")
-
-# Manual assignment settings; trial factoring = 2
-assignment = {"cores": "1",
-              "num_to_get": options.num_to_get,
-              "pref": "2",
-              "exp_lo": "",
-              "exp_hi": "",
-              }
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 cj = cookielib.CookieJar()
