@@ -23,6 +23,7 @@ def cleanup(data):
     output = re.sub(" ", "+", data)
     output = re.sub(":", "%3A", output)
     output = re.sub(",", "%2C", output)
+    output = re.sub("\n", "%0A", output)
     return output
 
 def exp_increase(line, max_exp):
@@ -115,25 +116,38 @@ def submit_work():
     results_copy = results
 
     # Sending the textarea is probably simpler than getting file
-    # upload to work. Also, line-wise submit is easier to get working
-    # than the full blob, especially as we need to traverse the list anyway.
+    # upload to work.
+
+    # Sending several results at a time is probably better, for both
+    # server load, and the acceptance of extra exponent
+    # ranges. Probably best to group these by the M# though, to avoid
+    # excessive payloads.
+
+    sendgroup = {}
+
     for line in results:
         s = re.search(r"M([0-9]*) ", line)
         if s:
             mersenne = s.groups()[0]
             if not "," + mersenne + "," in work:
-                r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(line) + "&B1=Submit")
-                
-                if "Processing result" in r.read():
-                    sent.append(line)
-                    results_copy.remove(line)
-                else:
-                    print("Submission failed.")
+                if not mersenne in sendgroup:
+                    sendgroup[mersenne] = []
+
+                sendgroup[mersenne].append(line)
         else:
             # Useless lines, like date stamps, can be removed, but
             # save the backups as usual
             sent.append(line)
             results_copy.remove(line)
+
+    for mersenne in sendgroup:
+        r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup("\n".join(sendgroup[mersenne])) + "&B1=Submit")
+        if "Processing result" in r.read():
+            sent += sendgroup[mersenne]
+            for line in sendgroup[mersenne]:
+                results_copy.remove(line)
+        else:
+            print("Submission failed.")
 
     write_list_file(resultsfile, results_copy)
     write_list_file(sentfile, sent)
