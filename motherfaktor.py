@@ -124,11 +124,8 @@ def get_assignment():
     if options.debug:
         print("Fetching " + str(num_to_get) + " assignments")
 
-    try:
-        r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-        tasks[level] += exp_increase(greplike(pattern, r.readlines()), int(options.max_exp))
-    except:
-        print("Fetch failed")
+    r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+    tasks[level] += exp_increase(greplike(pattern, r.readlines()), int(options.max_exp))
 
     write_list_file(workfile[level], tasks[level])
 
@@ -182,15 +179,12 @@ def submit_work():
         if options.debug:
             print("Submitting\n" + data)
 
-        try:
-            r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-            if "Processing result" in r.read():
-                sent += sendgroup[mersenne]
-                for line in sendgroup[mersenne]:
-                    results_copy.remove(line)
-            else:
-                print("Submission failed.")
-        except:
+        r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
+        if "Processing result" in r.read():
+            sent += sendgroup[mersenne]
+            for line in sendgroup[mersenne]:
+                results_copy.remove(line)
+        else:
             print("Submission failed.")
 
     write_list_file(resultsfile, results_copy)
