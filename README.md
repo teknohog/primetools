@@ -24,9 +24,7 @@ like this:
 
      CMD="motherfaktor.py -u teknohog -p salakalasana -n 2 -e 71 -gs"
      while true; do
-         if [ -n "`$CMD | grep -i fail`" ];
-	    then exit
-	 fi
+         if [ -n "`$CMD | grep -i fail`" ]; then exit; fi
          ./mfakto -d $DEVICE
      done
 
