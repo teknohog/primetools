@@ -45,17 +45,14 @@ def greplike(pattern, l):
             output.append(s.groups()[0])
     return output
 
-def ReadFile(file):
-    File = open(file, "r")
-    contents = File.read()
-    File.close()
-    return contents
-
-def ReadLines(file):
-    File = open(file, "r")
-    contents = File.readlines()
-    File.close()
-    return map(lambda x: x.rstrip(), contents)
+def read_list_file(filename):
+    if os.path.exists(filename):
+        File = open(filename, "r")
+        contents = File.readlines()
+        File.close()
+        return map(lambda x: x.rstrip(), contents)
+    else:
+        return []
 
 def num_topup(l, targetsize):
     num_existing = len(l)
@@ -78,10 +75,7 @@ def cache_flush():
     tasks = [[]]*2
 
     for level in [0, 1]:
-        if os.path.exists(workfile[level]):
-            tasks[level] = greplike(workpattern, ReadLines(workfile[level]))
-        else:
-            tasks[level] = []
+        tasks[level] = greplike(workpattern, read_list_file(workfile[level]))
 
     num_to_get = num_topup(tasks[0], int(options.num_cache))
 
@@ -105,10 +99,7 @@ def get_assignment():
         level = 0
         cachesize = options.num_cache
 
-    if os.path.exists(workfile[level]):
-        tasks = greplike(workpattern, ReadLines(workfile[level]))
-    else:
-        tasks = []
+    tasks = greplike(workpattern, read_list_file(workfile[level]))
 
     num_to_get = num_topup(tasks, int(cachesize))
 
@@ -136,18 +127,18 @@ def get_assignment():
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
+
+    results = read_list_file(resultsfile)
+
+    if len(results) == 0:
+        print("No results found to send.")
+        return
     
-    if os.path.exists(workfile[0]):
-        work = ReadFile(workfile[0])
-    else:
-        work = ""
+    # This is only for spotting the M# exponent, so formatting
+    # newlines etc. is not important
+    work = "\n".join(read_list_file(workfile[0]))
 
-    results = ReadLines(resultsfile)
-
-    if os.path.exists(sentfile):
-        sent = ReadLines(sentfile)
-    else:
-        sent = []
+    sent = read_list_file(sentfile)
 
     # Need to preserve the original list while traversing it
     results_copy = results
@@ -252,4 +243,6 @@ if options.get_assignment:
 
 if options.submit_work:
     submit_work()
+
+
 
