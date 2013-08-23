@@ -136,8 +136,8 @@ def submit_work():
 
     sent = read_list_file(sentfile)
 
-    # Need to preserve the original list while traversing it
-    results_copy = results
+    # Incomplete results to be saved back to resultsfile
+    results_keep = []
 
     # Sending the textarea is probably simpler than getting file
     # upload to work.
@@ -149,7 +149,8 @@ def submit_work():
 
     sendgroup = {}
 
-    for line in results:
+    while len(results) > 0:
+        line = results.pop(0)
         s = re.search(r"M([0-9]*) ", line)
         if s:
             mersenne = s.groups()[0]
@@ -158,11 +159,12 @@ def submit_work():
                     sendgroup[mersenne] = []
 
                 sendgroup[mersenne].append(line)
+            else:
+                results_keep.append(line)
         else:
             # Useless lines, like date stamps, can be removed, but
             # save the backups as usual
             sent.append(line)
-            results_copy.remove(line)
 
     if len(sendgroup) == 0:
         print("No complete results found to send.")
@@ -177,12 +179,11 @@ def submit_work():
         r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
         if "Processing result" in r.read():
             sent += sendgroup[mersenne]
-            for line in sendgroup[mersenne]:
-                results_copy.remove(line)
         else:
+            results_keep += sendgroup[mersenne]
             print("Submission failed.")
 
-    write_list_file(resultsfile, results_copy)
+    write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent)
 
 from optparse import OptionParser
