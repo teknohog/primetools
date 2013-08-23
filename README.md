@@ -50,12 +50,18 @@ fetch+submit cycle, but motherfaktor.py can cache additional work in
 l2cache.txt. So ideally you will never run out of work, even if the
 network fails occasionally.
 
+By default, L2 cache is not used. If you use it for some time and then
+disable it again, it will be flushed to worktodo.txt anyway, so there
+is no work left unused. In fact, it is now flushed every time you run
+motherfakto.py.
+
 
 Plans/TODO/issues:
 ------------------
 
 * When submitting soon after mfakto exits, the script sometimes only
-  sends partial results. Maybe it just needs a sync first...
+  sends partial results. This is not a huge issue though, because the
+  remaining results will be sent on the next round.
 
 * We should take control of mfakto to enable file operations without a
   full restart. Perhaps something as simple as process stop and resume
