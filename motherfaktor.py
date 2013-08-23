@@ -72,34 +72,32 @@ import cookielib
 import urllib2
 import re
 
-def get_assignment():
-    # Parse Factor= lines, add new tasks at the end of workfile
-
-    pattern = r"Factor=.*"
+def cache_flush():
+    # Flush l2 cache into l1
 
     tasks = [[]]*2
 
-    if os.path.exists(workfile[0]):
-        tasks[0] = greplike(pattern, ReadLines(workfile[0]))
-    else:
-        tasks[0] = []
+    for level in [0, 1]:
+        if os.path.exists(workfile[level]):
+            tasks[level] = greplike(workpattern, ReadLines(workfile[level]))
+        else:
+            tasks[level] = []
 
-    # First top up l1 cache from l2 if possible, no matter what options
-    if os.path.exists(workfile[1]):
-        tasks[1] = ReadLines(workfile[1])
-        num_to_get = num_topup(tasks[0], int(options.num_cache))
-        for i in range(num_to_get):
-            if len(tasks[1]) > 0:
-                tasks[0].append(tasks[1].pop(0))
+    num_to_get = num_topup(tasks[0], int(options.num_cache))
 
-        for i in [0, 1]:
-            write_list_file(workfile[i], tasks[i])
-    else:
-        # Only needed if l2 activated in the following stage, but
-        # simplifies overall code
-        tasks[1] = []
+    for i in range(num_to_get):
+        if len(tasks[1]) > 0:
+            tasks[0].append(tasks[1].pop(0))
 
-    # Then fetch from network to the desired cache level
+    for level in [0, 1]:
+        write_list_file(workfile[level], tasks[level])
+
+def get_assignment():
+    # Parse Factor= lines, add new tasks at the end of workfile
+
+    # l2->l1 flush is done elsewhere, now just fetch from network to
+    # the desired cache level
+
     if int(options.l2cache) > 0:
         level = 1
         cachesize = options.l2cache
@@ -107,7 +105,12 @@ def get_assignment():
         level = 0
         cachesize = options.num_cache
 
-    num_to_get = num_topup(tasks[level], int(cachesize))
+    if os.path.exists(workfile[level]):
+        tasks = greplike(workpattern, ReadLines(workfile[level]))
+    else:
+        tasks = []
+
+    num_to_get = num_topup(tasks, int(cachesize))
 
     if num_to_get < 1:
         print("Cache full, not getting new work")
@@ -125,9 +128,10 @@ def get_assignment():
         print("Fetching " + str(num_to_get) + " assignments")
 
     r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-    tasks[level] += exp_increase(greplike(pattern, r.readlines()), int(options.max_exp))
 
-    write_list_file(workfile[level], tasks[level])
+    tasks += exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
+
+    write_list_file(workfile[level], tasks)
 
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
@@ -221,9 +225,18 @@ resultsfile = os.path.join(workdir, "results.txt")
 # A cumulative backup
 sentfile = os.path.join(workdir, "results_sent.txt")
 
+# Trial factoring
+workpattern = r"Factor=.*"
+
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 cj = cookielib.CookieJar()
 opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+
+# First, flush l2 cache into l1 if possible, no matter what options
+# given. This is especially important when quitting work, so nothing
+# is left in either cache -- it may take a few rounds to flush it
+# completely.
+cache_flush()
 
 # Log in
 r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
