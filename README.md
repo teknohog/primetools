@@ -51,11 +51,11 @@ network fails occasionally.
 By default, L2 cache is not used. If you use it for some time and then
 disable it again, it will be flushed to worktodo.txt anyway, so there
 is no work left unused. In fact, it is now flushed every time you run
-motherfakto.py.
+motherfaktor.py.
 
 There is a small caveat if you start with -l without any existing
 assignments. Data from the network goes to L2 cache first, but the
-flush from L2 to worktodo.txt happens at the start of motherfakto.py
+flush from L2 to worktodo.txt happens at the start of motherfaktor.py
 (for a good reason). Rather than complicating this logic further, you
 can just run the script again to fix it (which should happen with the
 shell loop anyway).
