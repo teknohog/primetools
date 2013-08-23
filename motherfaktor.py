@@ -129,10 +129,6 @@ def submit_work():
     # worktodo.txt any more
 
     results = read_list_file(resultsfile)
-
-    if len(results) == 0:
-        print("No results found to send.")
-        return
     
     # This is only for spotting the M# exponent, so formatting
     # newlines etc. is not important
@@ -167,6 +163,10 @@ def submit_work():
             # save the backups as usual
             sent.append(line)
             results_copy.remove(line)
+
+    if len(sendgroup) == 0:
+        print("No complete results found to send.")
+        return
 
     for mersenne in sendgroup:
         data = "\n".join(sendgroup[mersenne])
