@@ -8,6 +8,9 @@
 
 import sys
 import os.path
+import cookielib
+import urllib2
+import re
 
 primenet_base = "http://www.mersenne.org/"
 
@@ -45,6 +48,11 @@ def greplike(pattern, l):
             output.append(s.groups()[0])
     return output
 
+def num_topup(l, targetsize):
+    num_existing = len(l)
+    num_needed = targetsize - num_existing
+    return max(num_needed, 0)
+
 def read_list_file(filename):
     if os.path.exists(filename):
         File = open(filename, "r")
@@ -54,75 +62,56 @@ def read_list_file(filename):
     else:
         return []
 
-def num_topup(l, targetsize):
-    num_existing = len(l)
-    num_needed = targetsize - num_existing
-    return max(num_needed, 0)
-
 def write_list_file(filename, l):
     content = "\n".join(l) + "\n"
     File = open(filename, "w")
     File.write(content)
     File.close()
 
-import cookielib
-import urllib2
-import re
+def get_assignment(flushonly=False):
+    # Parse Factor= lines, add new tasks at the end of workfile
 
-def cache_flush():
-    # Flush l2 cache into l1
+    # Top up both caches with their desired sizes. So what if l2 size
+    # is 0. This makes the logic simple, and solves the problem where
+    # both caches are empty upon startup.
 
-    tasks = [[]]*2
+    cachesizes = map(int, [options.num_cache, options.l2cache])
 
-    for level in [0, 1]:
-        tasks[level] = greplike(workpattern, read_list_file(workfile[level]))
+    tasks = [greplike(workpattern, read_list_file(workfile[level])) for level in [0, 1]]
 
-    num_to_get = num_topup(tasks[0], int(options.num_cache))
+    # Flush first to maintain the temporal ordering of assignments
+    while len(tasks[0]) < cachesizes[0] and len(tasks[1]) > 0:
+        tasks[0].append(tasks[1].pop(0))
 
-    for i in range(num_to_get):
-        if len(tasks[1]) > 0:
-            tasks[0].append(tasks[1].pop(0))
+    if not flushonly:
+        num_to_get = sum([num_topup(tasks[level], cachesizes[level]) for level in [0, 1]])
+
+        if num_to_get < 1:
+            print("Caches full, not getting new work")
+        else:
+            # Manual assignment settings; trial factoring = 2
+            assignment = {"cores": "1",
+                          "num_to_get": str(num_to_get),
+                          "pref": "2",
+                          "exp_lo": "",
+                          "exp_hi": "",
+                      }
+
+            if options.debug:
+                print("Fetching " + str(num_to_get) + " assignments")
+
+            r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+
+            new_tasks = exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
+
+            # Prioritize l1 -- we may get fewer tasks than asked for
+            while len(tasks[0]) < cachesizes[0] and len(new_tasks) > 0:
+                tasks[0].append(new_tasks.pop(0))
+
+            tasks[1] += new_tasks
 
     for level in [0, 1]:
         write_list_file(workfile[level], tasks[level])
-
-def get_assignment():
-    # Parse Factor= lines, add new tasks at the end of workfile
-
-    # l2->l1 flush is done elsewhere, now just fetch from network to
-    # the desired cache level
-
-    if int(options.l2cache) > 0:
-        level = 1
-        cachesize = options.l2cache
-    else:
-        level = 0
-        cachesize = options.num_cache
-
-    tasks = greplike(workpattern, read_list_file(workfile[level]))
-
-    num_to_get = num_topup(tasks, int(cachesize))
-
-    if num_to_get < 1:
-        print("Cache full, not getting new work")
-        return
-
-    # Manual assignment settings; trial factoring = 2
-    assignment = {"cores": "1",
-                  "num_to_get": str(num_to_get),
-                  "pref": "2",
-                  "exp_lo": "",
-                  "exp_hi": "",
-              }
-
-    if options.debug:
-        print("Fetching " + str(num_to_get) + " assignments")
-
-    r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-
-    tasks += exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
-
-    write_list_file(workfile[level], tasks)
 
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
@@ -220,15 +209,20 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 # Trial factoring
 workpattern = r"Factor=.*"
 
-# adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-cj = cookielib.CookieJar()
-opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
-
 # First, flush l2 cache into l1 if possible, no matter what options
 # given. This is especially important when quitting work, so nothing
 # is left in either cache -- it may take a few rounds to flush it
 # completely.
-cache_flush()
+if not options.get_assignment:
+    get_assignment(flushonly=True)
+
+    if not options.submit_work:
+        # No network action needed, so skip login
+        sys.exit()
+
+# adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
+cj = cookielib.CookieJar()
+opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
 # Log in
 r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
@@ -236,6 +230,12 @@ r = opener.open(primenet_base + "account/?user_login=" + options.username + "&us
 # Check for succesful login
 if not options.username + " logged-in" in r.read():
     print("Login failed.")
+
+    # Flushing is now integrated into get_assignment(), so need to
+    # force a login-less version
+    if options.get_assignment:
+        get_assignment(flushonly=True)
+
     sys.exit()
 
 # Allow both operations with the same login
