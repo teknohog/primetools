@@ -16,6 +16,7 @@ import urllib2
 import re
 from time import sleep
 from os import remove
+from shutil import copy
 
 primenet_base = "http://www.mersenne.org/"
 
@@ -77,10 +78,8 @@ def read_list_file(filename):
     if os.path.exists(lockfile):
         return "locked"
     else:
-        # There must be a shorter way to touch a file in Python...
-        l = open(lockfile, "w")
-        l.write("")
-        l.close()
+        # There may still be a faster way to create an empty file in Python...
+        copy(filename, lockfile)
 
         if os.path.exists(filename):
             File = open(filename, "r")
