@@ -113,63 +113,60 @@ def get_assignment(flushonly=False):
     for level in [0, 1]:
         write_list_file(workfile[level], tasks[level])
 
+def mersenne_find(line, complete=True):
+    # This is only for spotting the M# exponent, so formatting
+    # newlines etc. is not important
+    work = "\n".join(read_list_file(workfile[0]))
+
+    s = re.search(r"M([0-9]*) ", line)
+    if s:
+        mersenne = s.groups()[0]
+        if not "," + mersenne + "," in work:
+            return complete
+        else:
+            return not complete
+    else:
+        return False
+
 def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
 
     results = read_list_file(resultsfile)
     
-    # This is only for spotting the M# exponent, so formatting
-    # newlines etc. is not important
-    work = "\n".join(read_list_file(workfile[0]))
-
     sent = read_list_file(sentfile)
-
-    # Incomplete results to be saved back to resultsfile
-    results_keep = []
 
     # Sending the textarea is probably simpler than getting file
     # upload to work.
 
     # Sending several results at a time is probably better, for both
     # server load, and the acceptance of extra exponent
-    # ranges. Probably best to group these by the M# though, to avoid
-    # excessive payloads.
+    # ranges.
 
-    sendgroup = {}
+    # Useless lines (not including a M#) are now discarded completely.
 
-    while len(results) > 0:
-        line = results.pop(0)
-        s = re.search(r"M([0-9]*) ", line)
-        if s:
-            mersenne = s.groups()[0]
-            if not "," + mersenne + "," in work:
-                if not mersenne in sendgroup:
-                    sendgroup[mersenne] = []
+    results_send = filter(mersenne_find, results)
+    results_keep = filter(lambda x: mersenne_find(x, complete=False), results)
 
-                sendgroup[mersenne].append(line)
-            else:
-                results_keep.append(line)
-        else:
-            # Useless lines, like date stamps, can be removed, but
-            # save the backups as usual
-            sent.append(line)
-
-    if len(sendgroup) == 0:
+    if len(results_send) == 0:
         print("No complete results found to send.")
         return
 
-    for mersenne in sendgroup:
-        data = "\n".join(sendgroup[mersenne])
+    while len(results_send) > 0:
+        sendbatch = []
+        while sum(map(len, sendbatch)) < sendlimit and len(results_send) > 0:
+            sendbatch.append(results_send.pop(0))
+
+        data = "\n".join(sendbatch)
         
         if options.debug:
             print("Submitting\n" + data)
 
         r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
         if "Processing result" in r.read():
-            sent += sendgroup[mersenne]
+            sent += sendbatch
         else:
-            results_keep += sendgroup[mersenne]
+            results_keep += sendbatch
             print("Submission failed.")
 
     write_list_file(resultsfile, results_keep)
@@ -208,6 +205,9 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 
 # Trial factoring
 workpattern = r"Factor=.*"
+
+# mersenne.org limit is about 4 KB; stay on the safe side
+sendlimit = 3500
 
 # First, flush l2 cache into l1 if possible, no matter what options
 # given. This is especially important when quitting work, so nothing
