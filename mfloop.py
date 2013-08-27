@@ -215,8 +215,8 @@ parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Secon
 (options, args) = parser.parse_args()
 
 progname = os.path.basename(sys.argv[0])
-
 workdir = os.path.expanduser(options.workdir)
+timeout = int(options.timeout)
 
 workfile = os.path.join(workdir, "worktodo.txt")
 
@@ -247,5 +247,5 @@ while True:
                 debug_print("Waiting for file access...")
                 sleep(2)
 
-    sleep(int(options.timeout))
+    sleep(timeout)
 
