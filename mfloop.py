@@ -14,7 +14,7 @@ import os.path
 import cookielib
 import urllib2
 import re
-from time import sleep, ctime
+from time import sleep
 from os import remove
 
 primenet_base = "http://www.mersenne.org/"
@@ -36,7 +36,7 @@ def cleanup(data):
 
 def debug_print(text):
     if options.debug:
-        print(ctime() + " " + text)
+        print(progname + ": " + text)
 
 def exp_increase(l, max_exp):
     output = []
@@ -116,7 +116,7 @@ def get_assignment():
     num_to_get = num_topup(tasks, int(options.num_cache))
 
     if num_to_get < 1:
-        print("Cache full, not getting new work")
+        debug_print("Cache full, not getting new work")
     else:
         # Manual assignment settings; trial factoring = 2
         assignment = {"cores": "1",
@@ -172,7 +172,7 @@ def submit_work():
     results_keep = filter(lambda x: mersenne_find(x, complete=False), results)
 
     if len(results_send) == 0:
-        print("No complete results found to send.")
+        debug_print("No complete results found to send.")
         # Don't just return here, files are still locked...
     else:
         while len(results_send) > 0:
@@ -190,7 +190,7 @@ def submit_work():
                 sent += sendbatch
             else:
                 results_keep += sendbatch
-                print("Submission failed.")
+                debug_print("Submission failed.")
 
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent)
@@ -213,6 +213,8 @@ parser.add_option("-s", "--submitonly", action="store_true", dest="submitonly", 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600")
 
 (options, args) = parser.parse_args()
+
+progname = os.path.basename(sys.argv[0])
 
 workdir = os.path.expanduser(options.workdir)
 
@@ -238,7 +240,7 @@ while True:
     r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
 
     if not options.username + " logged-in" in r.read():
-        print("Login failed.")
+        debug_print("Login failed.")
     else:
         for f in [get_assignment, submit_work]:
             while f() == "locked":
