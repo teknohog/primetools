@@ -4,6 +4,25 @@ primetools
 Scripts for working with prime number search
 
 
+mfloop.py
+---------
+
+Automatic work assignment and submission script for mfakto and
+possibly other similar applications.
+
+Developed from motherfaktor.py, this version is intended to run in
+parallel with mfakto. It uses lockfiles to avoid conflicts when
+accessing files. Thus a few options are new or different:
+
+* -s now stands for submit only, in case you want to finish current
+   work and quit. There is no -g equivalent.
+
+* New timeout option for the wait loop. By default, attempt network
+  update every hour.
+
+Run mfloop.py -h for more details on options.
+
+
 motherfaktor.py
 ---------------
 
@@ -52,19 +71,3 @@ By default, L2 cache is not used. If you use it for some time and then
 disable it again, it will be flushed to worktodo.txt anyway, so there
 is no work left unused. In fact, it is now flushed every time you run
 motherfaktor.py.
-
-
-Plans/TODO/issues:
-------------------
-
-* We should take control of mfakto to enable file operations without a
-  full restart. Perhaps something as simple as process stop and resume
-  could work. It would be nicer to keep the work cache rather full all
-  the time; the L2 cache + loop construct should suffice for this in
-  practice.
-
-* One idea for safe file operations would be pseudofiles that appear
-  like the work files to mfakto, but are actually operated behind the
-  scenes by Python. For example named pipes might work as gateways
-  between the two programs. Or perhaps mfakto could be ported to
-  PyOpenCL...
