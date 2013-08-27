@@ -14,11 +14,12 @@ Developed from motherfaktor.py, this version is intended to run in
 parallel with mfakto. It uses lockfiles to avoid conflicts when
 accessing files. Thus a few options are new or different:
 
-* -s now stands for submit only, in case you want to finish current
-   work and quit. There is no -g equivalent.
+* --getwork and --submit are removed as redundant. Use -n 0 in case
+   you want to finish current work and quit, without getting any new
+   work.
 
-* New timeout option for the wait loop. By default, attempt network
-  update every hour.
+* --timeout for the wait loop. By default, attempt network update
+  every hour.
 
 Run mfloop.py -h for more details on options.
 

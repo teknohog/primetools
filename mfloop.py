@@ -103,10 +103,6 @@ def write_list_file(filename, l):
     remove(lockfile)
 
 def get_assignment():
-    # Easier to handle here than in the main loop
-    if options.submitonly:
-        return
-
     w = read_list_file(workfile)
     if w == "locked":
         return "locked"
@@ -207,8 +203,6 @@ parser.add_option("-p", "--password", dest="password", help="Your Primenet passw
 parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
-
-parser.add_option("-s", "--submitonly", action="store_true", dest="submitonly", default=False, help="Only submit completed work, do not get new work")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600")
 
