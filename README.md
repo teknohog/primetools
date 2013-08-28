@@ -3,6 +3,9 @@ primetools
 
 Scripts for working with prime number search
 
+These are written in standard Python without any external libraries. I
+have only tested these on Linux, but there should be no OS limitations.
+
 
 mfloop.py
 ---------
@@ -35,8 +38,6 @@ speed up this stage greatly with GPUs. It relies on manual work
 assignment and submission from/to
 http://www.mersenne.org/. motherfaktor.py automates this, so mfakto
 can keep working indefinitely.
-
-It is written in Python without any external libraries.
 
 Since it operates on the same files as mfakto, it is probably best run
 only when mfakto is not running, for example in a loop like this:
