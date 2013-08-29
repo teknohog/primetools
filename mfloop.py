@@ -126,9 +126,11 @@ def get_assignment():
         
         debug_print("Fetching " + str(num_to_get) + " assignments")
 
-        r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-
-        tasks += exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
+        try:
+            r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+            tasks += exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
+        except urllib2.URLError:
+            debug_print("URL open error")
 
     write_list_file(workfile, tasks)
 
@@ -183,12 +185,15 @@ def submit_work():
         
             debug_print("Submitting\n" + data)
 
-            r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-            if "Processing result" in r.read():
-                sent += sendbatch
-            else:
-                results_keep += sendbatch
-                debug_print("Submission failed.")
+            try:
+                r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
+                if "Processing result" in r.read():
+                    sent += sendbatch
+                else:
+                    results_keep += sendbatch
+                    debug_print("Submission failed.")
+            except urllib2.URLError:
+                debug_print("URL open error")
 
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent)
@@ -233,15 +238,19 @@ opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
 
 while True:
     # Log in -- should be OK even if we are already in
-    r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
+    try:
+        r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
 
-    if not options.username + " logged-in" in r.read():
-        debug_print("Login failed.")
-    else:
-        for f in [get_assignment, submit_work]:
-            while f() == "locked":
-                debug_print("Waiting for file access...")
-                sleep(2)
+        if not options.username + " logged-in" in r.read():
+            debug_print("Login failed.")
+        else:
+            for f in [get_assignment, submit_work]:
+                while f() == "locked":
+                    debug_print("Waiting for file access...")
+                    sleep(2)
 
+    except urllib2.URLError:
+        debug_print("URL open error")
+            
     sleep(timeout)
 
