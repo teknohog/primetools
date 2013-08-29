@@ -212,7 +212,7 @@ parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working 
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 
-parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600")
+parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
 (options, args) = parser.parse_args()
 
@@ -252,6 +252,9 @@ while True:
 
     except urllib2.URLError:
         debug_print("URL open error")
+
+    if timeout <= 0:
+        break
             
     sleep(timeout)
 
