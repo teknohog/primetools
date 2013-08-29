@@ -193,6 +193,7 @@ def submit_work():
                     results_keep += sendbatch
                     debug_print("Submission failed.")
             except urllib2.URLError:
+                results_keep += sendbatch
                 debug_print("URL open error")
 
     write_list_file(resultsfile, results_keep)
