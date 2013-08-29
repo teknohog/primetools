@@ -15,7 +15,7 @@ import cookielib
 import urllib2
 import re
 from time import sleep
-from os import remove
+import os
 
 primenet_base = "http://www.mersenne.org/"
 
@@ -74,13 +74,8 @@ def read_list_file(filename):
     # Used when we plan to write the new version, so use locking
     lockfile = filename + ".lck"
 
-    if os.path.exists(lockfile):
-        return "locked"
-    else:
-        # There must be a shorter way to touch a file in Python...
-        l = open(lockfile, "w")
-        l.write("")
-        l.close()
+    try:
+        os.open(lockfile, os.O_CREAT | os.O_EXCL)
 
         if os.path.exists(filename):
             File = open(filename, "r")
@@ -89,6 +84,12 @@ def read_list_file(filename):
             return map(lambda x: x.rstrip(), contents)
         else:
             return []
+
+    except OSError, e:
+        if e.errno == 17:
+            return "locked"
+        else:
+            raise
 
 def write_list_file(filename, l):
     # Assume we put the lock in upon reading the file, so we can
@@ -100,7 +101,7 @@ def write_list_file(filename, l):
     File.write(content)
     File.close()
 
-    remove(lockfile)
+    os.remove(lockfile)
 
 def get_assignment():
     w = read_list_file(workfile)
