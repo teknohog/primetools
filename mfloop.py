@@ -75,7 +75,8 @@ def read_list_file(filename):
     lockfile = filename + ".lck"
 
     try:
-        os.open(lockfile, os.O_CREAT | os.O_EXCL)
+        fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
+        os.close(fd)
 
         if os.path.exists(filename):
             File = open(filename, "r")
