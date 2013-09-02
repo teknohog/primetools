@@ -43,3 +43,22 @@ http://mersenneforum.org/showthread.php?t=15646
 http://mersenneforum.org/mfakto/
 
 https://github.com/Bdot42/mfakto
+
+
+Future plans
+------------
+
+* Serving multiple mfakto directories with one process. I already have
+  a simple idea for this, but the benefits over running separate
+  mfloops would be questionable: a slight reduction in network traffic
+  vs. more complicated configuration and less control over individual
+  GPUs.
+
+* Other work types besides trial factoring. This should be trivial to
+  implement, at least with similar worktodo.txt/results.txt formats...
+
+* .. but the only other major application seems to be CUDALucas, which
+  accepts work as a commandline option. A Python wrapper for this
+  should be relatively simple, as the network part is already done. I
+  do not have Nvidia cards, though, but I am seriously considering to
+  get one for this, despite my firm opensource stance :-j
