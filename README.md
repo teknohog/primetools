@@ -32,6 +32,16 @@ increased to 70 (if lower than that). Also,
 
 * Use -n 0 to finish work and not get any new assignments.
 
+Optionally, it can also use gpu72.com for work assignments. The
+results are still submitted to mersenne.org, so you need login
+credentials for both sites, for example:
+
+mfloop.py -u teknohog -p merspass -U teknohog -P gpupass
+
+In this case, there is a hardcoded minimum of 72 for the upper limit
+of the exponent range. If a fetch from gpu72.com fails, it will try
+primenet instead.
+
 Run mfloop.py -h for more details on options.
 
 Some of the ideas are adapted from http://www.gpu72.com/spider/.
@@ -43,22 +53,6 @@ http://mersenneforum.org/showthread.php?t=15646
 http://mersenneforum.org/mfakto/
 
 https://github.com/Bdot42/mfakto
-
-
-mfloop72.py
------------
-
-A variant of mfloop.py that gets assignments from gpu72.com. The
-results are submitted to mersenne.org, so you need login credentials
-for both sites, for example:
-
-mfloop72.py -u teknohog -p merspass -U teknohog -P gpupass
-
-The behaviour of -e or --exp is different, because gpu72.com assigns
-relatively high exponents by itself. Therefore, this option affects
-the request directly, and does not increment the value afterwards. The
-default value is 72; while the site accepts 71, there is often no work
-available with such low values.
 
 
 Future plans
@@ -78,5 +72,3 @@ Future plans
   should be relatively simple, as the network part is already done. I
   do not have Nvidia cards, though, but I am seriously considering to
   get one for this, despite my firm opensource stance :-j
-
-* Unify mfloop.py and mfloop72.py, as they share a lot of code.

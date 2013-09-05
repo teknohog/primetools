@@ -2,12 +2,14 @@
 
 # by teknohog
 
-# Automatic assignment handler for manual testing at
-# mersenne.org. Written with mfakto in mind, might work with other
-# similar applications.
+# Automatic assignment handler for manual testing at mersenne.org and
+# optionally gpu72.com.
 
-# This version runs in parallel with mfakto. It uses lockfiles to
-# avoid conflicts when updating files.
+# Written with mfakto in mind, this only handles trial factoring work
+# for now. It should work with mfaktc as well.
+
+# This version can run in parallel with the factoring program, as it
+# uses lockfiles to avoid conflicts when updating files.
 
 import sys
 import os.path
@@ -16,8 +18,10 @@ import urllib2
 import re
 from time import sleep
 import os
+import urllib
 
-primenet_base = "http://www.mersenne.org/"
+primenet_baseurl = "http://www.mersenne.org/"
+gpu72_baseurl = "http://www.gpu72.com/"
 
 def ass_generate(assignment):
     output = ""
@@ -108,10 +112,57 @@ def write_list_file(filename, l):
 
     os.remove(lockfile)
 
+def primenet_fetch(num_to_get):
+    if not primenet_login:
+        return []
+
+    # Manual assignment settings; trial factoring = 2
+    assignment = {"cores": "1",
+                  "num_to_get": str(num_to_get),
+                  "pref": "2",
+                  "exp_lo": "",
+                  "exp_hi": "",
+    }
+    
+    try:
+        r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
+        return exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
+    except urllib2.URLError:
+        debug_print("URL open error at primenet_fetch")
+        return []
+
+def gpu72_fetch(num_to_get):
+    assignment = {"Number": str(num_to_get),
+                  "GHzDays": "",
+                  "Low": "0",
+                  "High": "10000000000",
+                  "Pledge": str(max(72, int(options.max_exp))),
+                  "Option": "0",
+    }
+
+    # This makes a POST instead of GET
+    data = urllib.urlencode(assignment)
+    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/lltf/", data)
+
+    try:
+        r = gpu72.open(req)
+        new_tasks = greplike(workpattern, r.readlines())
+        # Remove dupes
+        return list(set(new_tasks))
+
+    except urllib2.URLError:
+        debug_print("URL open error at gpu72_fetch")
+
+    return []
+
 def get_assignment():
     w = read_list_file(workfile)
     if w == "locked":
         return "locked"
+
+    fetch = {True: gpu72_fetch,
+             False: primenet_fetch,
+         }
 
     tasks = greplike(workpattern, w)
 
@@ -120,21 +171,14 @@ def get_assignment():
     if num_to_get < 1:
         debug_print("Cache full, not getting new work")
     else:
-        # Manual assignment settings; trial factoring = 2
-        assignment = {"cores": "1",
-                      "num_to_get": str(num_to_get),
-                      "pref": "2",
-                      "exp_lo": "",
-                      "exp_hi": "",
-                  }
-        
         debug_print("Fetching " + str(num_to_get) + " assignments")
+        new_tasks = fetch[use_gpu72](num_to_get)
 
-        try:
-            r = opener.open(primenet_base + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-            tasks += exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
-        except urllib2.URLError:
-            debug_print("URL open error")
+        # Fallback to primenet in case of problems
+        if use_gpu72 and len(new_tasks) == 0:
+            new_tasks = fetch[not use_gpu72](num_to_get)
+
+        tasks += new_tasks
 
     write_list_file(workfile, tasks)
 
@@ -190,7 +234,7 @@ def submit_work():
             debug_print("Submitting\n" + data)
 
             try:
-                r = opener.open(primenet_base + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
+                r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
                 if "Processing result" in r.read():
                     sent += sendbatch
                 else:
@@ -208,17 +252,22 @@ parser = OptionParser()
 
 parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="Display debugging info")
 
-parser.add_option("-e", "--exp", dest="max_exp", default="0", help="Upper limit of exponent, to optionally replace the assigned one")
+parser.add_option("-e", "--exp", dest="max_exp", default="72", help="Upper limit of exponent, default 72")
 
-parser.add_option("-u", "--username", dest="username", help="Your Primenet user name")
-parser.add_option("-p", "--password", dest="password", help="Your Primenet password")
+parser.add_option("-u", "--username", dest="username", help="Primenet user name")
+parser.add_option("-p", "--password", dest="password", help="Primenet password")
 parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
+
+parser.add_option("-U", "--gpu72user", dest="guser", help="GPU72 user name", default="")
+parser.add_option("-P", "--gpu72pass", dest="gpass", help="GPU72 password")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
 (options, args) = parser.parse_args()
+
+use_gpu72 = (len(options.guser) > 0)
 
 progname = os.path.basename(sys.argv[0])
 workdir = os.path.expanduser(options.workdir)
@@ -238,24 +287,36 @@ workpattern = r"Factor=.*(,[0-9]+){3}"
 sendlimit = 3500
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-cj = cookielib.CookieJar()
-opener = urllib2.build_opener(urllib2.HTTPCookieProcessor(cj))
+primenet_cj = cookielib.CookieJar()
+primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
+
+if use_gpu72:
+    # Basic http auth
+    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+    password_mgr.add_password(None, gpu72_baseurl + "/account/", options.guser, options.gpass)
+    handler = urllib2.HTTPBasicAuthHandler(password_mgr)
+    gpu72 = urllib2.build_opener(handler)
 
 while True:
-    # Log in -- should be OK even if we are already in
+    # Log in to primenet
     try:
-        r = opener.open(primenet_base + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
+        r = primenet.open(primenet_baseurl + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
 
         if not options.username + " logged-in" in r.read():
+            primenet_login = False
             debug_print("Login failed.")
         else:
-            for f in [get_assignment, submit_work]:
-                while f() == "locked":
-                    debug_print("Waiting for file access...")
-                    sleep(2)
+            primenet_login = True
+            while submit_work() == "locked":
+                debug_print("Waiting for results file access...")
+                sleep(2)
 
     except urllib2.URLError:
-        debug_print("URL open error")
+        debug_print("Primenet URL open error")
+
+    while get_assignment() == "locked":
+        debug_print("Waiting for worktodo.txt access...")
+        sleep(2)
 
     if timeout <= 0:
         break
