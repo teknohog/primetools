@@ -18,7 +18,7 @@ import urllib2
 import re
 from time import sleep
 import os
-import urllib, httplib
+import urllib
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
