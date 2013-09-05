@@ -65,9 +65,13 @@ def num_topup(l, targetsize):
 def readonly_file(filename):
     # Used when there is no intention to write the file back, so don't
     # check or write lockfiles. Also returns a single string, no list.
-    File = open(filename, "r")
-    contents = File.read()
-    File.close()
+    if os.path.exists(filename):
+        File = open(filename, "r")
+        contents = File.read()
+        File.close()
+    else:
+        contents = ""
+
     return contents
 
 def read_list_file(filename):
@@ -228,7 +232,7 @@ resultsfile = os.path.join(workdir, "results.txt")
 sentfile = os.path.join(workdir, "results_sent.txt")
 
 # Trial factoring
-workpattern = r"Factor=.*"
+workpattern = r"Factor=.*(,[0-9]+){3}"
 
 # mersenne.org limit is about 4 KB; stay on the safe side
 sendlimit = 3500
