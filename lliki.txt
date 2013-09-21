@@ -1,0 +1,60 @@
+lliki.py
+--------
+
+Automatic work assignment and submission script for clLucas (and
+CUDALucas).
+
+Similarly to mfloop.py, this script aims to submit completed work,
+found in result.txt, to Primenet, and fetch new work into
+worktodo.txt. One essential difference, though, is that clLucas takes
+the work as a command line parameter, rather than reading the file. So
+this script also parses the assignment and outputs the necessary
+parameter. The output is given as a shell variable assignment for easy
+scripting, e.g. MERSENNE=110503 for the prime exponent 110503.
+
+Therefore, this script is not a background daemon, and for continuous
+operation it makes sense to run a loop like this:
+
+while true; do
+    eval $(lliki.py -u user -p pass -n 2)
+    ./clLucas -aggressive -d $DEVICE -f $FFT -threads $THREADS $MERSENNE
+done
+
+While clLucas only takes one exponent at a time, this script allows
+you to cache more assignments in worktodo.txt, using the -n
+option, so it can provide more work even during network outages.
+
+Naturally, since clLucas does not touch worktodo.txt, this script
+clears assignments from the file, once completed.
+
+By default, lliki.py fetches double-checking work, but you can also
+select first-time LL work with -T 100 or 102. The reason for the
+default choice is mainly because clLucas is rather experimental.
+
+GPU72.com is currently not supported, since LL testing is only given
+to select individuals. It would be trivial to add, since the
+functionality is already in mfloop.py.
+
+
+More on clLucas
+---------------
+
+http://www.mersenneforum.org/showthread.php?t=18297
+
+
+Plans/todo
+----------
+
+* Background operation, a little like in mfloop.py. This is not
+  actually that important, because one LL test takes a few days, so
+  waiting a few seconds each time is not that bad. Also, the time for
+  each test is rather fixed -- it cannot finish early like trial
+  factoring. Furthermore, there are potential file locking
+  issues. Nevertheless, there is a workaround of sorts in cllucas.sh.
+
+
+About the name
+--------------
+
+"iki" is a Finnish prefix roughly meaning "eternal" or something that
+keeps going forever. It also has nice connotations in Japanese.
