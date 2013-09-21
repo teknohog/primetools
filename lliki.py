@@ -3,7 +3,7 @@
 # by teknohog
 
 # Automatic assignment handler for clLucas and manual testing at
-# mersenne.org. Should work with CUDALucas too with small modifications.
+# mersenne.org. Should also work with CUDALucas and similar programs.
 
 import sys
 import os.path
