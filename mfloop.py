@@ -100,15 +100,18 @@ def read_list_file(filename):
         else:
             raise
 
-def write_list_file(filename, l):
+def write_list_file(filename, l, mode="w"):
     # Assume we put the lock in upon reading the file, so we can
     # safely write the file and remove the lock
     lockfile = filename + ".lck"
 
-    content = "\n".join(l) + "\n"
-    File = open(filename, "w")
-    File.write(content)
-    File.close()
+    # A "null append" is meaningful, as we can call this to clear the
+    # lockfile. In this case the main file need not be touched.
+    if mode != "a" or len(l) > 0:
+        content = "\n".join(l) + "\n"
+        File = open(filename, mode)
+        File.write(content)
+        File.close()
 
     os.remove(lockfile)
 
@@ -170,6 +173,8 @@ def get_assignment():
 
     if num_to_get < 1:
         debug_print("Cache full, not getting new work")
+        # Must write something anyway to clear the lockfile
+        new_tasks = []
     else:
         debug_print("Fetching " + str(num_to_get) + " assignments")
         new_tasks = fetch[use_gpu72](num_to_get)
@@ -178,9 +183,7 @@ def get_assignment():
         if use_gpu72 and len(new_tasks) == 0:
             new_tasks = fetch[not use_gpu72](num_to_get)
 
-        tasks += new_tasks
-
-    write_list_file(workfile, tasks)
+    write_list_file(workfile, new_tasks, "a")
 
 def mersenne_find(line, complete=True):
     work = readonly_file(workfile)
@@ -206,11 +209,14 @@ def submit_work():
         # Remove the lock in case one of these was unlocked at start
         for i in range(len(files)):
             if rs[i] != "locked":
-                write_list_file(files[i], rs[i])
+                write_list_file(files[i], [], "a")
                 
         return "locked"
 
-    (results, sent) = rs
+    results = rs[0]
+
+    # Only for new results, to be appended to results_sent
+    sent = []
 
     # Use the textarea form to submit several results at once.
 
@@ -245,7 +251,7 @@ def submit_work():
                 debug_print("URL open error")
 
     write_list_file(resultsfile, results_keep)
-    write_list_file(sentfile, sent)
+    write_list_file(sentfile, sent, "a")
 
 from optparse import OptionParser
 parser = OptionParser()
