@@ -79,15 +79,18 @@ def read_list_file(filename):
         else:
             raise
 
-def write_list_file(filename, l):
+def write_list_file(filename, l, mode="w"):
     # Assume we put the lock in upon reading the file, so we can
     # safely write the file and remove the lock
     lockfile = filename + ".lck"
 
-    content = "\n".join(l) + "\n"
-    File = open(filename, "w")
-    File.write(content)
-    File.close()
+    # A "null append" is meaningful, as we can call this to clear the
+    # lockfile. In this case the main file need not be touched.
+    if mode != "a" or len(l) > 0:
+        content = "\n".join(l) + "\n"
+        File = open(filename, mode)
+        File.write(content)
+        File.close()
 
     os.remove(lockfile)
 
@@ -171,11 +174,14 @@ def submit_work():
         # Remove the lock in case one of these was unlocked at start
         for i in range(len(files)):
             if rs[i] != "locked":
-                write_list_file(files[i], rs[i])
+                write_list_file(files[i], [], "a")
                 
         return "locked"
 
-    (results, sent) = rs
+    results = rs[0]
+
+    # Only for new results, to be appended to sentfile
+    sent = []
 
     # Example: M( 110503 )P, n = 6144, clLucas v1.00
     results_send = greplike(r"M\( ([0-9]*) \).*", results)
@@ -210,7 +216,7 @@ def submit_work():
                 debug_print("URL open error")
 
     write_list_file(resultsfile, results_keep)
-    write_list_file(sentfile, sent)
+    write_list_file(sentfile, sent, "a")
 
 from optparse import OptionParser
 parser = OptionParser()
