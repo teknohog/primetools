@@ -306,7 +306,13 @@ if use_gpu72:
 while True:
     # Log in to primenet
     try:
-        r = primenet.open(primenet_baseurl + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
+        login_data = {"user_login": options.username,
+                      "user_password": options.password,
+                  }
+        
+        # This makes a POST instead of GET
+        data = urllib.urlencode(login_data)
+        r = primenet.open(primenet_baseurl + "default.php", data)
 
         if not options.username + " logged-in" in r.read():
             primenet_login = False

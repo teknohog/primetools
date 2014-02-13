@@ -268,7 +268,13 @@ primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
 
 try:
     # Log in to primenet
-    r = primenet.open(primenet_baseurl + "account/?user_login=" + options.username + "&user_password=" + options.password + "&B1=GO")
+    login_data = {"user_login": options.username,
+                  "user_password": options.password,
+              }
+    
+    # This makes a POST instead of GET
+    data = urllib.urlencode(login_data)
+    r = primenet.open(primenet_baseurl + "default.php", data)
     
     if not options.username + " logged-in" in r.read():
         primenet_login = False
