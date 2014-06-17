@@ -135,6 +135,11 @@ def primenet_fetch(num_to_get):
         return []
 
 def gpu72_fetch(num_to_get):
+    if options.gpu72_type == "dctf":
+        gpu72_type = "dctf"
+    else:
+        gpu72_type = "lltf"
+
     if options.gpu72_option == "lowest_tf_level":
         option = "1"
     elif options.gpu72_option == "highest_tf_level":
@@ -143,9 +148,11 @@ def gpu72_fetch(num_to_get):
         option = "3"
     elif options.gpu72_option == "oldest_exponent":
         option = "4"
-    elif options.gpu72_option == "lhm_bit_first":
+    elif gpu72_type == "dctf" and options.gpu72_option == "no_p1_done":
+        option = "5"
+    elif gpu72_type == "lltf" and options.gpu72_option == "lhm_bit_first":
         option = "6"
-    elif options.gpu72_option == "lhm_depth_first":
+    elif gpu72_type == "lltf" and options.gpu72_option == "lhm_depth_first":
         option = "7"
     elif options.gpu72_option == "let_gpu72_decide":
         option = "9"
@@ -162,7 +169,7 @@ def gpu72_fetch(num_to_get):
 
     # This makes a POST instead of GET
     data = urllib.urlencode(assignment)
-    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/lltf/", data)
+    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/" + gpu72_type + "/", data)
 
     try:
         r = gpu72.open(req)
@@ -277,7 +284,9 @@ parser.add_option("-d", "--debug", action="store_true", dest="debug", default=Fa
 
 parser.add_option("-e", "--exp", dest="max_exp", default="72", help="Upper limit of exponent, default 72")
 
-parser.add_option("-o", "--option", dest="gpu72_option", default="what_makes_sense", help="Option to fetch, default what_makes_sense. Other valid options are lowest_tf_level, highest_tf_level, lowest_exponent, oldest_exponent, lhm_bit_first, lhm_depth_first, and let_gpu72_decide (let_gpu72_decide may override max_exp).")
+parser.add_option("-T", "--type", dest="gpu72_type", default="lltf", help="Type of work, lltf or dctf, default lltf.")
+
+parser.add_option("-o", "--option", dest="gpu72_option", default="what_makes_sense", help="Option to fetch, default what_makes_sense. Other valid options are lowest_tf_level, highest_tf_level, lowest_exponent, oldest_exponent, no_p1_done (dctf only), lhm_bit_first (lltf only), lhm_depth_first (lltf only), and let_gpu72_decide (let_gpu72_decide may override max_exp).")
 
 parser.add_option("-u", "--username", dest="username", help="Primenet user name")
 parser.add_option("-p", "--password", dest="password", help="Primenet password")
