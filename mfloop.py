@@ -139,7 +139,7 @@ def gpu72_fetch(num_to_get):
                   "GHzDays": "",
                   "Low": "0",
                   "High": "10000000000",
-                  "Pledge": str(max(72, int(options.max_exp))),
+                  "Pledge": str(max(71, int(options.max_exp))),
                   "Option": "0",
     }
 
