@@ -19,6 +19,7 @@ import re
 from time import sleep
 import os
 import urllib
+import math
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
@@ -65,6 +66,30 @@ def num_topup(l, targetsize):
     num_existing = len(l)
     num_needed = targetsize - num_existing
     return max(num_needed, 0)
+
+def ghzd_topup(l, ghdz_target):
+    ghzd_existing = 0.0
+    for line in l:
+        pieces = line.split(",")
+        # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
+        exponent = int(pieces[1])
+        for bits in range(int(pieces[2]), int(pieces[3])):
+            if bits < 48:
+                continue
+            elif bits <= 61:
+                timing = 2.4 * 0.00465
+            elif bits == 62 or bits == 63:
+                timing = 2.4 * 0.00743
+            elif bits == 64:
+                timing = 2.4 * 0.00711
+            else:
+                timing = 2.4 * 0.00707
+
+            ghzd_existing += timing * (1 << (bits - 48)) * 1680.0 / exponent
+
+    debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
+
+    return max(0, math.ceil(ghdz_target - ghzd_existing))
 
 def readonly_file(filename):
     # Used when there is no intention to write the file back, so don't
@@ -134,7 +159,7 @@ def primenet_fetch(num_to_get):
         debug_print("URL open error at primenet_fetch")
         return []
 
-def gpu72_fetch(num_to_get):
+def gpu72_fetch(num_to_get, ghzd_to_get = 0):
     if options.gpu72_type == "dctf":
         gpu72_type = "dctf"
     else:
@@ -159,8 +184,15 @@ def gpu72_fetch(num_to_get):
     else:
         option = "0"
 
-    assignment = {"Number": str(num_to_get),
-                  "GHzDays": "",
+    if ghzd_to_get > 0:
+        num_to_get_str = "0"
+        ghzd_to_get_str = str(ghzd_to_get)
+    else:
+        num_to_get_str = str(num_to_get)
+        ghzd_to_get_str = ""
+
+    assignment = {"Number": num_to_get_str,
+                  "GHzDays": ghzd_to_get_str,
                   "Low": "0",
                   "High": "10000000000",
                   "Pledge": str(max(71, int(options.max_exp))),
@@ -193,18 +225,28 @@ def get_assignment():
 
     tasks = greplike(workpattern, w)
 
-    num_to_get = num_topup(tasks, int(options.num_cache))
+    if use_gpu72 and options.ghzd_cache != "":
+        ghzd_to_get = ghzd_topup(tasks, int(options.ghzd_cache))
+        num_to_get = 0
+    else:
+        ghzd_to_get = 0
+        num_to_get = num_topup(tasks, int(options.num_cache))
 
-    if num_to_get < 1:
+    if num_to_get < 1 and ghzd_to_get == 0:
         debug_print("Cache full, not getting new work")
         # Must write something anyway to clear the lockfile
         new_tasks = []
     else:
-        debug_print("Fetching " + str(num_to_get) + " assignments")
-        new_tasks = fetch[use_gpu72](num_to_get)
+        if use_gpu72 and ghzd_to_get > 0:
+            debug_print("Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
+            new_tasks = fetch[use_gpu72](num_to_get, ghzd_to_get)
+        else:
+            debug_print("Fetching " + str(num_to_get) + " assignments")
+            new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
-        if use_gpu72 and len(new_tasks) == 0:
+        if use_gpu72 and num_to_get and len(new_tasks) == 0:
+            debug_print("Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
     write_list_file(workfile, new_tasks, "a")
@@ -296,6 +338,7 @@ parser.add_option("-U", "--gpu72user", dest="guser", help="GPU72 user name", def
 parser.add_option("-P", "--gpu72pass", dest="gpass", help="GPU72 password")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
+parser.add_option("-g", "--ghzd_cache", dest="ghzd_cache", default="", help="GHz-days of assignments to cache beyond the first/current assignment in worktodo.txt. Overrides num_cache.")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
