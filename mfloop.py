@@ -73,7 +73,7 @@ def ghzd_topup(l, ghdz_target):
         pieces = line.split(",")
         # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
         exponent = int(pieces[1])
-        for bits in range(int(pieces[2]), int(pieces[3])):
+        for bits in range((int(pieces[2]) + 1), int(pieces[3]) + 1):
             if bits < 48:
                 continue
             elif bits <= 61:
