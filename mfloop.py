@@ -74,18 +74,18 @@ def ghzd_topup(l, ghdz_target):
         # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
         exponent = int(pieces[1])
         for bits in range((int(pieces[2]) + 1), int(pieces[3]) + 1):
-            if bits < 48:
-                continue
-            elif bits <= 61:
-                timing = 2.4 * 0.00465
-            elif bits == 62 or bits == 63:
-                timing = 2.4 * 0.00743
+            if bits > 65:
+                timing = 28.50624 # 2.4 * 0.00707 * 1680.0
             elif bits == 64:
-                timing = 2.4 * 0.00711
+                timing = 28.66752 # 2.4 * 0.00711 * 1680.0
+            elif bits == 63 or bits == 62:
+                timing = 29.95776 # 2.4 * 0.00743 * 1680.0
+            elif bits >= 48:
+                timing = 18.7488 # 2.4 * 0.00465 * 1680.0
             else:
-                timing = 2.4 * 0.00707
+                continue
 
-            ghzd_existing += timing * (1 << (bits - 48)) * 1680.0 / exponent
+            ghzd_existing += timing * (1 << (bits - 48)) / exponent
 
     debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
