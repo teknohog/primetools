@@ -19,6 +19,7 @@ import re
 from time import sleep
 import os
 import urllib
+import math
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
@@ -65,6 +66,30 @@ def num_topup(l, targetsize):
     num_existing = len(l)
     num_needed = targetsize - num_existing
     return max(num_needed, 0)
+
+def ghzd_topup(l, ghdz_target):
+    ghzd_existing = 0.0
+    for line in l:
+        pieces = line.split(",")
+        # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
+        exponent = int(pieces[1])
+        for bits in range((int(pieces[2]) + 1), int(pieces[3]) + 1):
+            if bits > 65:
+                timing = 28.50624 # 2.4 * 0.00707 * 1680.0
+            elif bits == 64:
+                timing = 28.66752 # 2.4 * 0.00711 * 1680.0
+            elif bits == 63 or bits == 62:
+                timing = 29.95776 # 2.4 * 0.00743 * 1680.0
+            elif bits >= 48:
+                timing = 18.7488 # 2.4 * 0.00465 * 1680.0
+            else:
+                continue
+
+            ghzd_existing += timing * (1 << (bits - 48)) / exponent
+
+    debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
+
+    return max(0, math.ceil(ghdz_target - ghzd_existing))
 
 def readonly_file(filename):
     # Used when there is no intention to write the file back, so don't
@@ -126,7 +151,7 @@ def primenet_fetch(num_to_get):
                   "exp_lo": "",
                   "exp_hi": "",
     }
-    
+
     try:
         r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
         return exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
@@ -134,18 +159,49 @@ def primenet_fetch(num_to_get):
         debug_print("URL open error at primenet_fetch")
         return []
 
-def gpu72_fetch(num_to_get):
-    assignment = {"Number": str(num_to_get),
-                  "GHzDays": "",
+def gpu72_fetch(num_to_get, ghzd_to_get = 0):
+    if options.gpu72_type == "dctf":
+        gpu72_type = "dctf"
+    else:
+        gpu72_type = "lltf"
+
+    if options.gpu72_option == "lowest_tf_level":
+        option = "1"
+    elif options.gpu72_option == "highest_tf_level":
+        option = "2"
+    elif options.gpu72_option == "lowest_exponent":
+        option = "3"
+    elif options.gpu72_option == "oldest_exponent":
+        option = "4"
+    elif gpu72_type == "dctf" and options.gpu72_option == "no_p1_done":
+        option = "5"
+    elif gpu72_type == "lltf" and options.gpu72_option == "lhm_bit_first":
+        option = "6"
+    elif gpu72_type == "lltf" and options.gpu72_option == "lhm_depth_first":
+        option = "7"
+    elif options.gpu72_option == "let_gpu72_decide":
+        option = "9"
+    else:
+        option = "0"
+
+    if ghzd_to_get > 0:
+        num_to_get_str = "0"
+        ghzd_to_get_str = str(ghzd_to_get)
+    else:
+        num_to_get_str = str(num_to_get)
+        ghzd_to_get_str = ""
+
+    assignment = {"Number": num_to_get_str,
+                  "GHzDays": ghzd_to_get_str,
                   "Low": "0",
                   "High": "10000000000",
                   "Pledge": str(max(71, int(options.max_exp))),
-                  "Option": "0",
+                  "Option": option,
     }
 
     # This makes a POST instead of GET
     data = urllib.urlencode(assignment)
-    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/lltf/", data)
+    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/" + gpu72_type + "/", data)
 
     try:
         r = gpu72.open(req)
@@ -169,18 +225,28 @@ def get_assignment():
 
     tasks = greplike(workpattern, w)
 
-    num_to_get = num_topup(tasks, int(options.num_cache))
+    if use_gpu72 and options.ghzd_cache != "":
+        ghzd_to_get = ghzd_topup(tasks, int(options.ghzd_cache))
+        num_to_get = 0
+    else:
+        ghzd_to_get = 0
+        num_to_get = num_topup(tasks, int(options.num_cache))
 
-    if num_to_get < 1:
+    if num_to_get < 1 and ghzd_to_get == 0:
         debug_print("Cache full, not getting new work")
         # Must write something anyway to clear the lockfile
         new_tasks = []
     else:
-        debug_print("Fetching " + str(num_to_get) + " assignments")
-        new_tasks = fetch[use_gpu72](num_to_get)
+        if use_gpu72 and ghzd_to_get > 0:
+            debug_print("Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
+            new_tasks = fetch[use_gpu72](num_to_get, ghzd_to_get)
+        else:
+            debug_print("Fetching " + str(num_to_get) + " assignments")
+            new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
-        if use_gpu72 and len(new_tasks) == 0:
+        if use_gpu72 and num_to_get and len(new_tasks) == 0:
+            debug_print("Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
     write_list_file(workfile, new_tasks, "a")
@@ -210,7 +276,7 @@ def submit_work():
         for i in range(len(files)):
             if rs[i] != "locked":
                 write_list_file(files[i], [], "a")
-                
+
         return "locked"
 
     results = rs[0]
@@ -236,7 +302,7 @@ def submit_work():
                 sendbatch.append(results_send.pop(0))
 
             data = "\n".join(sendbatch)
-        
+
             debug_print("Submitting\n" + data)
 
             try:
@@ -260,6 +326,10 @@ parser.add_option("-d", "--debug", action="store_true", dest="debug", default=Fa
 
 parser.add_option("-e", "--exp", dest="max_exp", default="72", help="Upper limit of exponent, default 72")
 
+parser.add_option("-T", "--gpu72type", dest="gpu72_type", default="lltf", help="GPU72 type of work, lltf or dctf, default lltf.")
+
+parser.add_option("-o", "--gpu72option", dest="gpu72_option", default="what_makes_sense", help="GPU72 Option to fetch, default what_makes_sense. Other valid values are lowest_tf_level, highest_tf_level, lowest_exponent, oldest_exponent, no_p1_done (dctf only), lhm_bit_first (lltf only), lhm_depth_first (lltf only), and let_gpu72_decide (let_gpu72_decide may override max_exp).")
+
 parser.add_option("-u", "--username", dest="username", help="Primenet user name")
 parser.add_option("-p", "--password", dest="password", help="Primenet password")
 parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and results.txt, default current")
@@ -268,6 +338,7 @@ parser.add_option("-U", "--gpu72user", dest="guser", help="GPU72 user name", def
 parser.add_option("-P", "--gpu72pass", dest="gpass", help="GPU72 password")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
+parser.add_option("-g", "--ghzd_cache", dest="ghzd_cache", default="", help="GHz-days of assignments to cache. Overrides num_cache.")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
@@ -309,7 +380,7 @@ while True:
         login_data = {"user_login": options.username,
                       "user_password": options.password,
                   }
-        
+
         # This makes a POST instead of GET
         data = urllib.urlencode(login_data)
         r = primenet.open(primenet_baseurl + "default.php", data)
@@ -332,6 +403,6 @@ while True:
 
     if timeout <= 0:
         break
-            
+
     sleep(timeout)
 
