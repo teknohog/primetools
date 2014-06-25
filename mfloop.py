@@ -195,7 +195,7 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
                   "GHzDays": ghzd_to_get_str,
                   "Low": "0",
                   "High": "10000000000",
-                  "Pledge": str(max(71, int(options.max_exp))),
+                  "Pledge": str(max(70, int(options.max_exp))),
                   "Option": option,
     }
 
@@ -245,7 +245,7 @@ def get_assignment():
             new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
-        if use_gpu72 and num_to_get and len(new_tasks) == 0:
+        if use_gpu72 and options.fallback == "1" and num_to_get and len(new_tasks) == 0:
             debug_print("Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
@@ -339,6 +339,7 @@ parser.add_option("-P", "--gpu72pass", dest="gpass", help="GPU72 password")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
 parser.add_option("-g", "--ghzd_cache", dest="ghzd_cache", default="", help="GHz-days of assignments to cache beyond the first/current assignment in worktodo.txt. Overrides num_cache.")
+parser.add_option("-f", "--fallback", dest="fallback", default="1", help="Fall back to mersenne.org when GPU72 fails or has no work, default 1.")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
