@@ -1,6 +1,6 @@
-
+@echo off
 REM Time to wait between reboots if needed. 
-set waittime=60
+set waittime=120
 
 REM ### mfloop settings
 REM ###
@@ -35,20 +35,34 @@ set mvar=-d 1
 REM Executable name
 set exec=mfakto.exe
 
+:check
+REM does not work; ?? IF NOT EXIST python.exe echo Error: python could not be found in path, press any key to exit&&pause >NUL &&goto exit
+IF NOT EXIST mfloop.py echo Error: mfloop.py could not be found, press any key to exit&&pause >NUL &&goto exit
+
 :start
 if %1:==-s: goto setservice
 start mfaktx.bat -s
 :crunch
 %exec% %mvar%
+echo ERROR: %exec% unexpectedly quit, waiting %waittime% seconds to restart...
 timeout /T %waittime% > NUL
+cls
 goto crunch
 
 :setservice
 title mfloop service
 set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime%
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
-REM IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%cache%. ELSE set mfloop_arg=%mfloop_arg% --num_cache=%cache%.
+IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%cache%
+
 :service
+cls
+title Mfloop service
+echo mfloop service
+echo running at: %cd%
 python.exe mfloop.py %mfloop_arg%
+echo ERROR: mfloop.py unexpectedly quit, waiting %waittime% seconds to restart...
 timeout /T %waittime% > NUL
 goto service
+
+:exit
