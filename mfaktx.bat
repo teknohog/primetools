@@ -16,7 +16,7 @@ REM GPU72 fetch options:
 REM GPU72 Option to fetch, default what_makes_sense. Other valid values are lowest_tf_level, highest_tf_level, lowest_exponent,
 REM oldest_exponent, no_p1_done (dctf only), lhm_bit_first (lltf only), lhm_depth_first (lltf only), and let_gpu72_decide (let_gpu72_decide may override max_exp)
 set gpu72_option=what_makes_sense
-
+set max_bit=73
 REM Arguments to mfaktx
 set mvar=-d 1
 
@@ -39,7 +39,7 @@ goto crunch
 
 :setservice
 title mfloop service
-set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime%
+set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit%
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%cache%
 
