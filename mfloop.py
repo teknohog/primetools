@@ -73,7 +73,8 @@ def ghzd_topup(l, ghdz_target):
         pieces = line.split(",")
         # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
         exponent = int(pieces[1])
-        for bits in range((int(pieces[2]) + 1), int(pieces[3]) + 1):
+        first_bit = int(pieces[2]) + 1
+        for bits in range(first_bit, int(pieces[3]) + 1):
             if bits > 65:
                 timing = 28.50624 # 2.4 * 0.00707 * 1680.0
             elif bits == 64:
@@ -85,7 +86,21 @@ def ghzd_topup(l, ghdz_target):
             else:
                 continue
 
-            ghzd_existing += timing * (1 << (bits - 48)) / exponent
+            bit_ghzd = timing * (1 << (bits - 48)) / exponent
+
+            # if there is a checkpoint file, subtract the work done
+            if (bits == first_bit):
+                checkpoint_file = os.path.join(workdir, "M"+str(exponent)+".ckp")
+                if (os.path.isfile(checkpoint_file)):
+                    File = open(checkpoint_file, "r")
+                    checkpoint = File.readline()
+                    File.close()
+                    checkpoint_pieces = checkpoint.split(" ")
+                    percent_done = float(checkpoint_pieces[5]) / float(checkpoint_pieces[3])
+                    bit_ghzd *= percent_done
+                    debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
+
+            ghzd_existing += bit_ghzd
 
     debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
