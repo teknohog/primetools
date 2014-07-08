@@ -5,9 +5,9 @@ set waittime=120
 set PrimenetUsername=test
 set PrimenetPassword=test123
 REM How much work to get: If using gpu72, use GHzdays. If not, number of assignments.
-set cache=100
+set WorkCache=100
 REM gpu72 0/no 1/yes
-set UseGpu72=1
+set UseGPU72=1
 set gpu72user=test
 set gpu72pass=test123
 set gpu72_type=lltf
@@ -32,6 +32,7 @@ IF NOT EXIST %exec% echo Error: %exec% could not be found, press any key to exit
 if %1:==-s: goto setservice
 start mfaktx.bat -s
 del *.lck /F/Q
+title %cd%\%exec%
 :crunch
 %exec% %mvar%
 echo ERROR: %exec% unexpectedly quit or ranout of work, waiting %waittime% seconds to restart...
@@ -45,7 +46,7 @@ set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %c
 IF %UseGPU72%==1 goto sGPU72 ELSE goto service
 :sGPU72
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
-IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%cache%
+IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%WorkCache%
 
 :service
 cls
