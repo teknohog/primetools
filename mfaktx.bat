@@ -16,6 +16,7 @@ REM GPU72 fetch options:
 REM GPU72 Option to fetch, default what_makes_sense. Other valid values are lowest_tf_level, highest_tf_level, lowest_exponent,
 REM oldest_exponent, no_p1_done (dctf only), lhm_bit_first (lltf only), lhm_depth_first (lltf only), and let_gpu72_decide (let_gpu72_decide may override max_exp)
 set gpu72_option=what_makes_sense
+REM Maximum bit to fetch
 set max_bit=73
 REM Arguments to mfaktx
 set mvar=-d 1
@@ -24,12 +25,13 @@ REM Executable name
 set exec=mfakto.exe
 
 :check
-REM does not work; ?? IF NOT EXIST python.exe echo Error: python could not be found in path, press any key to exit&&pause >NUL &&goto exit
 IF NOT EXIST mfloop.py echo Error: mfloop.py could not be found, press any key to exit&&pause >NUL &&goto exit
+IF NOT EXIST %exec% echo Error: %exec% could not be found, press any key to exit&&pause >NUL &&goto exit
 
 :start
 if %1:==-s: goto setservice
 start mfaktx.bat -s
+del *.lck /F/Q
 :crunch
 %exec% %mvar%
 echo ERROR: %exec% unexpectedly quit or ranout of work, waiting %waittime% seconds to restart...
@@ -39,7 +41,9 @@ goto crunch
 
 :setservice
 title mfloop service
-set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit%
+set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit% -d
+IF %UseGPU72%==1 goto sGPU72 ELSE goto service
+:sGPU72
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%cache%
 
