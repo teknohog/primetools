@@ -24,6 +24,8 @@ set mvar=-d 1
 REM Executable name
 set exec=mfakto.exe
 
+REM ###END OF SETTINGS###
+
 :check
 IF NOT EXIST mfloop.py echo Error: mfloop.py could not be found, press any key to exit&&pause >NUL &&goto exit
 IF NOT EXIST %exec% echo Error: %exec% could not be found, press any key to exit&&pause >NUL &&goto exit
@@ -33,6 +35,8 @@ if %1:==-s: goto setservice
 start mfaktx.bat -s
 del *.lck /F/Q
 title %cd%\%exec%
+:check
+IF NOT EXIST worktodo.txt echo ERROR: worktodo.txt not found, waiting for work...&&timeout /T 3 >NUL&&cls&&goto check
 :crunch
 %exec% %mvar%
 echo ERROR: %exec% unexpectedly quit or ranout of work, waiting %waittime% seconds to restart...
