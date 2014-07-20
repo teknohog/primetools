@@ -47,7 +47,7 @@ goto crunch
 :setservice
 title mfloop service
 set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit% -d
-IF %UseGPU72%==1 goto sGPU72 ELSE goto service
+REM IF %UseGPU72%==1 goto sGPU72 ELSE goto service
 :sGPU72
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%WorkCache%
