@@ -36,7 +36,8 @@ start mfaktx.bat -s
 del *.lck /F/Q
 title %cd%\%exec%
 :check
-IF NOT EXIST worktodo.txt echo ERROR: worktodo.txt not found, waiting for work...&&timeout /T 3 >NUL&&cls&&goto check
+cls
+IF NOT EXIST worktodo.txt echo ERROR: worktodo.txt not found, waiting for work...&&timeout /T 3 >NUL&&goto check
 :crunch
 %exec% %mvar%
 echo ERROR: %exec% unexpectedly quit or ranout of work, waiting %waittime% seconds to restart...
@@ -46,11 +47,10 @@ goto crunch
 
 :setservice
 title mfloop service
-set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit% -d
+set mfloop_arg=--username %PrimenetUsername% --password=%PrimenetPassword% -w %cd% --timeout=%waittime% -e %max_bit% -d --ghzd_cache=%WorkCache%
 REM IF %UseGPU72%==1 goto sGPU72 ELSE goto service
 :sGPU72
 IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --gpu72user=%gpu72user% --gpu72pass=%gpu72pass% --gpu72type=%gpu72_type% --gpu72option=%gpu72_option%
-IF %UseGpu72%==1 set mfloop_arg=%mfloop_arg% --ghzd_cache=%WorkCache%
 
 :service
 cls
