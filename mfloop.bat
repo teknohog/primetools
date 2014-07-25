@@ -24,17 +24,39 @@ set mvar=-d 1
 REM Executable name
 set exec=mfakto.exe
 
+
+REM Multi-clients
+REM NOTICE: The first client does not count, use the second client's path in 2, and so on. Settings will be same for every client.
+set MultipleClients=1
+set Clients=3
+set 2=C:\1
+set 3=C:\2
 REM ###END OF SETTINGS###
 
 :check
+IF %MultipleClients%==1 set dir=%~1 ELSE set dir=%cd% 
 IF NOT EXIST mfloop.py echo Error: mfloop.py could not be found, press any key to exit&&pause >NUL &&goto exit
 IF NOT EXIST %exec% echo Error: %exec% could not be found, press any key to exit&&pause >NUL &&goto exit
+:check_multi
+IF %MultipleClients%==1 goto multi else goto start
+echo Warning: Unknown input for %MultipleClients%, disabling.  
+goto start
+
+:multi
+REM Replace with "for" later
+goto %clients%
+:3
+start mfloop.bat %3%
+:2
+start mfloop.bat %2%
+:1
+echo Warning: Only 1 client set.
 
 :start
 if %1:==-s: goto setservice
 start mfaktx.bat -s
 del *.lck /F/Q
-title %cd%\%exec%
+title %dir%\%exec%
 :check
 cls
 IF NOT EXIST worktodo.txt echo ERROR: worktodo.txt not found, waiting for work...&&timeout /T 3 >NUL&&goto check
