@@ -89,14 +89,19 @@ def ghzd_topup(l, ghdz_target):
             bit_ghzd = timing * (1 << (bits - 48)) / exponent
 
             # if there is a checkpoint file, subtract the work done
-            if (bits == first_bit):
+            if bits == first_bit:
                 checkpoint_file = os.path.join(workdir, "M"+str(exponent)+".ckp")
-                if (os.path.isfile(checkpoint_file)):
+                if os.path.isfile(checkpoint_file):
                     File = open(checkpoint_file, "r")
                     checkpoint = File.readline()
                     File.close()
                     checkpoint_pieces = checkpoint.split(" ")
-                    percent_done = float(checkpoint_pieces[5]) / float(checkpoint_pieces[3])
+                    if checkpoint_pieces[4] == "mfakto":
+                        progress_index = 6
+                    else:
+                        progress_index = 5
+
+                    percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
                     bit_ghzd *= percent_done
                     debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
 
