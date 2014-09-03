@@ -397,7 +397,7 @@ while True:
 
         # This makes a POST instead of GET
         data = urllib.urlencode(login_data)
-        r = primenet.open(primenet_baseurl + "default.php", data)
+        r = primenet.open(primenet_baseurl + "account/default.php", data)
 
         if not options.username + " logged-in" in r.read():
             primenet_login = False
