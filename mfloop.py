@@ -31,14 +31,6 @@ def ass_generate(assignment):
     #return output.rstrip("&")
     return output
 
-def cleanup(data):
-    # as in submit_spider; urllib2.quote does not quite work here
-    output = re.sub(" ", "+", data)
-    output = re.sub(":", "%3A", output)
-    output = re.sub(",", "%2C", output)
-    output = re.sub("\n", "%0A", output)
-    return output
-
 def debug_print(text):
     if options.debug:
         print(progname + ": " + text)
@@ -326,7 +318,8 @@ def submit_work():
             debug_print("Submitting\n" + data)
 
             try:
-                r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
+                post_data = urllib.urlencode({"data": data, "B1": "Submit" })
+                r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
                 if "Processing result" in r.read():
                     sent += sendbatch
                 else:
@@ -382,7 +375,7 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 workpattern = r"Factor=.*(,[0-9]+){3}"
 
 # mersenne.org limit is about 4 KB; stay on the safe side
-sendlimit = 3500
+sendlimit = 3000
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 primenet_cj = cookielib.CookieJar()
