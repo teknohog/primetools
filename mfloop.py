@@ -31,14 +31,6 @@ def ass_generate(assignment):
     #return output.rstrip("&")
     return output
 
-def cleanup(data):
-    # as in submit_spider; urllib2.quote does not quite work here
-    output = re.sub(" ", "+", data)
-    output = re.sub(":", "%3A", output)
-    output = re.sub(",", "%2C", output)
-    output = re.sub("\n", "%0A", output)
-    return output
-
 def debug_print(text):
     if options.debug:
         print(progname + ": " + text)
@@ -73,7 +65,8 @@ def ghzd_topup(l, ghdz_target):
         pieces = line.split(",")
         # calculate ghz-d http://mersenneforum.org/showpost.php?p=152280&postcount=204
         exponent = int(pieces[1])
-        for bits in range((int(pieces[2]) + 1), int(pieces[3]) + 1):
+        first_bit = int(pieces[2]) + 1
+        for bits in range(first_bit, int(pieces[3]) + 1):
             if bits > 65:
                 timing = 28.50624 # 2.4 * 0.00707 * 1680.0
             elif bits == 64:
@@ -85,7 +78,26 @@ def ghzd_topup(l, ghdz_target):
             else:
                 continue
 
-            ghzd_existing += timing * (1 << (bits - 48)) / exponent
+            bit_ghzd = timing * (1 << (bits - 48)) / exponent
+
+            # if there is a checkpoint file, subtract the work done
+            if bits == first_bit:
+                checkpoint_file = os.path.join(workdir, "M"+str(exponent)+".ckp")
+                if os.path.isfile(checkpoint_file):
+                    File = open(checkpoint_file, "r")
+                    checkpoint = File.readline()
+                    File.close()
+                    checkpoint_pieces = checkpoint.split(" ")
+                    if checkpoint_pieces[4] == "mfakto":
+                        progress_index = 6
+                    else:
+                        progress_index = 5
+
+                    percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
+                    bit_ghzd *= percent_done
+                    debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
+
+            ghzd_existing += bit_ghzd
 
     debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
@@ -195,7 +207,7 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
                   "GHzDays": ghzd_to_get_str,
                   "Low": "0",
                   "High": "10000000000",
-                  "Pledge": str(max(71, int(options.max_exp))),
+                  "Pledge": str(max(70, int(options.max_exp))),
                   "Option": option,
     }
 
@@ -245,7 +257,7 @@ def get_assignment():
             new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
-        if use_gpu72 and num_to_get and len(new_tasks) == 0:
+        if use_gpu72 and options.fallback == "1" and num_to_get and len(new_tasks) == 0:
             debug_print("Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
@@ -306,8 +318,10 @@ def submit_work():
             debug_print("Submitting\n" + data)
 
             try:
-                r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-                if "Processing result" in r.read():
+                post_data = urllib.urlencode({"data": data, "B1": "Submit" })
+                r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
+                res = r.read();
+                if "Processing result" in res or "Accepted" in res:
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
@@ -338,7 +352,8 @@ parser.add_option("-U", "--gpu72user", dest="guser", help="GPU72 user name", def
 parser.add_option("-P", "--gpu72pass", dest="gpass", help="GPU72 password")
 
 parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
-parser.add_option("-g", "--ghzd_cache", dest="ghzd_cache", default="", help="GHz-days of assignments to cache. Overrides num_cache.")
+parser.add_option("-g", "--ghzd_cache", dest="ghzd_cache", default="", help="GHz-days of assignments to cache, taking into account checkpoint files. Overrides num_cache.")
+parser.add_option("-f", "--fallback", dest="fallback", default="1", help="Fall back to mersenne.org when GPU72 fails or has no work, default 1.")
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
@@ -361,7 +376,7 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 workpattern = r"Factor=.*(,[0-9]+){3}"
 
 # mersenne.org limit is about 4 KB; stay on the safe side
-sendlimit = 3500
+sendlimit = 3000
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 primenet_cj = cookielib.CookieJar()
@@ -383,7 +398,7 @@ while True:
 
         # This makes a POST instead of GET
         data = urllib.urlencode(login_data)
-        r = primenet.open(primenet_baseurl + "default.php", data)
+        r = primenet.open(primenet_baseurl + "account/default.php", data)
 
         if not options.username + " logged-in" in r.read():
             primenet_login = False
