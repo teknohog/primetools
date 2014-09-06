@@ -320,7 +320,8 @@ def submit_work():
             try:
                 post_data = urllib.urlencode({"data": data, "B1": "Submit" })
                 r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
-                if "Processing result" in r.read():
+                res = r.read();
+                if "Processing result" in res or "Accepted" in res:
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
