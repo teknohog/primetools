@@ -213,7 +213,7 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
 
     # This makes a POST instead of GET
     data = urllib.urlencode(assignment)
-    req = urllib2.Request(gpu72_baseurl + "/account/getassignments/" + gpu72_type + "/", data)
+    req = urllib2.Request(gpu72_baseurl + "account/getassignments/" + gpu72_type + "/", data)
 
     try:
         r = gpu72.open(req)
@@ -318,7 +318,7 @@ def submit_work():
             debug_print("Submitting\n" + data)
 
             try:
-                post_data = urllib.urlencode({"data": data, "B1": "Submit" })
+                post_data = urllib.urlencode({"data": data})
                 r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
                 res = r.read();
                 if "Processing result" in res or "Accepted" in res:
@@ -385,7 +385,7 @@ primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
 if use_gpu72:
     # Basic http auth
     password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
-    password_mgr.add_password(None, gpu72_baseurl + "/account/", options.guser, options.gpass)
+    password_mgr.add_password(None, gpu72_baseurl + "account/", options.guser, options.gpass)
     handler = urllib2.HTTPBasicAuthHandler(password_mgr)
     gpu72 = urllib2.build_opener(handler)
 
@@ -398,7 +398,7 @@ while True:
 
         # This makes a POST instead of GET
         data = urllib.urlencode(login_data)
-        r = primenet.open(primenet_baseurl + "account/default.php", data)
+        r = primenet.open(primenet_baseurl + "default.php", data)
 
         if not options.username + " logged-in" in r.read():
             primenet_login = False
