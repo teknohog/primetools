@@ -32,7 +32,7 @@ IF NOT EXIST %exec% echo Error: %exec% could not be found, press any key to exit
 
 :start
 if %1:==-s: goto setservice
-start mfaktx.bat -s
+start %0 -s
 del *.lck /F/Q
 title %cd%\%exec%
 :check
