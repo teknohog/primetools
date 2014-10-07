@@ -400,7 +400,7 @@ while True:
         data = urllib.urlencode(login_data)
         r = primenet.open(primenet_baseurl + "default.php", data)
 
-        if not options.username + " logged-in" in r.read():
+        if not options.username + "<br>logged in" in r.read():
             primenet_login = False
             debug_print("Login failed.")
         else:
