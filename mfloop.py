@@ -94,7 +94,7 @@ def ghzd_topup(l, ghdz_target):
                         progress_index = 5
 
                     percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
-                    bit_ghzd *= percent_done
+                    bit_ghzd *= 1 - percent_done
                     debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
 
             ghzd_existing += bit_ghzd
