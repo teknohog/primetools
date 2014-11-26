@@ -206,7 +206,7 @@ def submit_work():
 
             try:
                 r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-                if "Processing result" in r.read():
+                if "processing:" in r.read():
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
