@@ -89,9 +89,8 @@ while true; do
     #eval $(lliki.py -N)
     #lliki.py $BASEOPTS $WORKOPTS -d &
     
-    set_fft
-
     if [ -n "$MERSENNE" ]; then
+	set_fft
 	./$PROG -aggressive -d $DEVICE -f $FFT -threads $THREADS $MERSENNE
     else
 	break
