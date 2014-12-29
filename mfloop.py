@@ -20,6 +20,8 @@ from time import sleep
 import os
 import urllib
 import math
+from optparse import OptionParser
+
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
@@ -49,7 +51,7 @@ def exp_increase(l, max_exp):
 def greplike(pattern, l):
     output = []
     for line in l:
-        s = re.search(r".*(" + pattern +")$", line)
+        s = re.search(r"(" + pattern + ")$", line)
         if s:
             output.append(s.groups()[0])
     return output
@@ -320,8 +322,8 @@ def submit_work():
             try:
                 post_data = urllib.urlencode({"data": data})
                 r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
-                res = r.read();
-                if "Processing result" in res or "Accepted" in res:
+                res = r.read()
+                if "processing:" in res or "Accepted" in res:
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
@@ -333,7 +335,7 @@ def submit_work():
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
 
-from optparse import OptionParser
+
 parser = OptionParser()
 
 parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="Display debugging info")
@@ -373,7 +375,7 @@ resultsfile = os.path.join(workdir, "results.txt")
 sentfile = os.path.join(workdir, "results_sent.txt")
 
 # Trial factoring
-workpattern = r"Factor=.*(,[0-9]+){3}"
+workpattern = r"Factor=[^,]*(,[0-9]+){3}"
 
 # mersenne.org limit is about 4 KB; stay on the safe side
 sendlimit = 3000
