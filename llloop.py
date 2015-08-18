@@ -220,18 +220,16 @@ def submit_work():
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
 
-def fft_threads(m):
-    # Optimal FFT size and threads for clLucas
+def fft_opt(m):
+    # Optimal FFT size for clLucas
     
     if int(m) > 38000000:
 	fft = 4194304
-	threads = 128
     else:
 	fft = 2097152
-	threads = 64
 
     # Format for clLucas
-    return ["-f", str(fft), "-threads", str(threads)]
+    return ["-f", str(fft)]
 
 def network_getwork():
     global options, primenet, primenet_baseurl, primenet_login
@@ -276,6 +274,9 @@ parser.add_argument("-u", "--username", dest="username", required=True, help="Pr
 parser.add_argument("-p", "--password", dest="password", required=True, help="Primenet password")
 
 parser.add_argument("-d", "--device", default="0", help="OpenCL device number for clLucas, default 0")
+
+parser.add_argument("-g", "--gputhreads", default="128", help="GPU threads, default 128")
+
 parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default 1")
 # -t is reserved for timeout as in mfloop.py, although not currently used here
 parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default 101 for DC, alternatively 100 or 102 for first-time LL")
@@ -306,7 +307,7 @@ primenet_login = False
 # Assuming clLucas in the workdir, could be generalized for any path
 # and alternatives like CudaLucas...
 binary = os.path.join(workdir, "clLucas")
-work_template = [binary, "-aggressive", "-d", options.device]
+work_template = [binary, "-aggressive", "-d", options.device, "-threads", options.gputhreads]
     
 while True:
     work = network_getwork()
@@ -315,7 +316,7 @@ while True:
         print("Out of work")
         break
     else:
-        worklist = work_template + fft_threads(work) + [work]
+        worklist = work_template + fft_opt(work) + [work]
 
     # Run clLucas in the foreground
     ecode = os.spawnvp(os.P_WAIT, worklist[0], worklist)
