@@ -273,13 +273,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("-u", "--username", dest="username", required=True, help="Primenet user name")
 parser.add_argument("-p", "--password", dest="password", required=True, help="Primenet password")
 
-parser.add_argument("-d", "--device", default="0", help="OpenCL device number for clLucas, default 0")
+parser.add_argument("-d", "--device", default="0", help="OpenCL device number for clLucas, default %(default)s")
 
-parser.add_argument("-g", "--gputhreads", default="128", help="GPU threads, default 128")
+parser.add_argument("-g", "--gputhreads", default="128", help="GPU threads, default %(default)s")
 
-parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default 1")
+parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default %(default)d")
 # -t is reserved for timeout as in mfloop.py, although not currently used here
-parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default 101 for DC, alternatively 100 or 102 for first-time LL")
+parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
 parser.add_argument("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and result.txt, default current")
 
 options = parser.parse_args()
