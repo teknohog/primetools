@@ -1,7 +1,7 @@
 #!/bin/bash
 
 BASEOPTS="-u prime -p example"
-WORKOPTS="-n 0 -T 101"
+WORKOPTS="-n 1 -T 101"
 
 #CLLOPTS="-d 0 -aggressive -threads 128" # 1.02
 CLLOPTS="-d 0 -polite 0 -threads 128 -sixstepfft" # 1.04
