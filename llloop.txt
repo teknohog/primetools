@@ -42,13 +42,3 @@ More on clLucas
 ---------------
 
 http://www.mersenneforum.org/showthread.php?t=18297
-
-
-Relation to lliki.py
---------------------
-
-llloop.py improves on lliki.py mainly by moving the shell helper
-functions (cllucas.sh) into the same Python script. The result is more
-stable and consistent, and should also be more portable to other
-operating systems. In addition, the option parser library has been
-changed to the more modern Argparse, along with minor logic fixes.
