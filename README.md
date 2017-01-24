@@ -17,8 +17,8 @@ mfloop.py
 For trial factoring with mfakto (should work with mfaktc too)
 
 
-lliki.py
---------
+llloop.py
+---------
 
 For Lucas-Lehmer primality testing with clLucas (also CUDALucas)
 

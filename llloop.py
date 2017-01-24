@@ -3,12 +3,18 @@
 # by teknohog
 
 # Automatic assignment handler for clLucas and manual testing at
-# mersenne.org. Should also work with CUDALucas and similar programs.
+# mersenne.org. Should also work with CUDALucas and similar programs
+# with minimal changes.
 
 import sys
 import os.path
 import re
 import os
+
+import cookielib
+import urllib2
+import urllib
+from time import sleep
 
 primenet_baseurl = "http://www.mersenne.org/"
 gpu72_baseurl = "http://www.gpu72.com/"
@@ -27,10 +33,6 @@ def cleanup(data):
     output = re.sub(",", "%2C", output)
     output = re.sub("\n", "%0A", output)
     return output
-
-def debug_print(text):
-    if options.debug:
-        print(progname + ": " + text)
 
 def greplike(pattern, l):
     output = []
@@ -95,6 +97,8 @@ def write_list_file(filename, l, mode="w"):
     os.remove(lockfile)
 
 def primenet_fetch(num_to_get):
+    global primenet_login
+    
     if not primenet_login:
         return []
 
@@ -112,7 +116,7 @@ def primenet_fetch(num_to_get):
         r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
         return greplike(workpattern, r.readlines())
     except urllib2.URLError:
-        debug_print("URL open error at primenet_fetch")
+        print("URL open error at primenet_fetch")
         return []
 
 def get_assignment():
@@ -126,26 +130,24 @@ def get_assignment():
     # If the work is finished, remove it from tasks
     tasks = filter(unfinished, tasks)
 
-    num_to_get = num_topup(tasks, int(options.num_cache))
+    num_to_get = num_topup(tasks, options.num_cache)
 
     if num_to_get < 1:
-        debug_print("Cache full, not getting new work")
+        print("Cache full, not getting new work")
     else:
-        debug_print("Fetching " + str(num_to_get) + " assignments")
+        print("Fetching " + str(num_to_get) + " assignments")
         tasks += primenet_fetch(num_to_get)
 
     # Output work for cllucas
     if len(tasks) > 0:
         mersenne = mersenne_find_task(tasks[0])
     else:
-        # Clear the shell variable
         mersenne = ""
-        debug_print("Out of work")
-
-    print("MERSENNE=" + mersenne)
 
     write_list_file(workfile, tasks)
 
+    return mersenne
+    
 def mersenne_find_task(line):
     s = re.search(r",([0-9]+),[0-9]+,[0-9]+", line)
     if s:
@@ -191,7 +193,7 @@ def submit_work():
     # Use the textarea form to submit several results at once.
 
     if len(results_send) == 0:
-        debug_print("No complete results found to send.")
+        print("No complete results found to send.")
         # Don't just return here, files are still locked...
     else:
         while len(results_send) > 0:
@@ -202,7 +204,7 @@ def submit_work():
 
             data = "\n".join(sendbatch)
         
-            debug_print("Submitting\n" + data)
+            print("Submitting\n" + data)
 
             try:
                 r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
@@ -210,84 +212,117 @@ def submit_work():
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
-                    debug_print("Submission failed.")
+                    print("Submission failed.")
             except urllib2.URLError:
                 results_keep += sendbatch
-                debug_print("URL open error")
+                print("URL open error")
 
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
 
-from optparse import OptionParser
-parser = OptionParser()
+def fft_opt(m):
+    # Optimal FFT size for clLucas
+    
+    if int(m) > 38000000:
+	fft = 4096
+    else:
+	fft = 2048
 
-parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="Display debugging info")
+    # clLucas 1.04 has automatic size incrementing. This script can
+    # still be useful for finding more optimal values, but in the
+    # meantime, start with something basic.
+    fft = 2048
+        
+    # Format for clLucas
+    return ["-f", str(fft) + "K"]
 
-parser.add_option("-u", "--username", dest="username", help="Primenet user name")
-parser.add_option("-p", "--password", dest="password", help="Primenet password")
-parser.add_option("-w", "--workdir", dest="workdir", default=".", help="Working directory with worktodo.txt and result.txt, default current")
+def network_getwork():
+    global options, primenet, primenet_baseurl, primenet_login
 
-parser.add_option("-N", "--nonetwork", action="store_true", dest="nonet", default=False, help="Do not access Primenet, only clean up workfile and print the next task")
+    mersenne = ""
+    
+    try:
+        # Log in to primenet
+        login_data = {"user_login": options.username,
+                      "user_password": options.password,
+                  }
+        
+        # This makes a POST instead of GET
+        data = urllib.urlencode(login_data)
+        r = primenet.open(primenet_baseurl + "default.php", data)
 
-parser.add_option("-n", "--num_cache", dest="num_cache", default="1", help="Number of assignments to cache, default 1")
+        primenet_login = options.username + "<br>logged in" in r.read()
 
+        # The order of get_assignment, then submit_work is important,
+        # because we check resultsfile for finished work when handling
+        # workfile. clLucas does not use lockfiles, so in the present
+        # form we can ignore them.
+
+        # This doesn't require login as it also gets tasks from the
+        # file cache.
+        mersenne = get_assignment()
+        
+        if primenet_login:
+            submit_work()
+        else:
+            print("Login failed.")
+
+    except urllib2.URLError:
+        print("Primenet URL open error")
+
+    return mersenne
+        
+import argparse
+parser = argparse.ArgumentParser()
+
+parser.add_argument("-o", "--cllopts", help="CLLucas options in a single string, e.g. '-d 0 -polite 0 -threads 128 -sixstepfft'")
+
+parser.add_argument("-u", "--username", dest="username", required=True, help="Primenet user name")
+parser.add_argument("-p", "--password", dest="password", required=True, help="Primenet password")
+
+parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default %(default)d")
 # -t is reserved for timeout as in mfloop.py, although not currently used here
-parser.add_option("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default 101 for DC, alternatively 100 or 102 for first-time LL")
+parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
+parser.add_argument("-w", "--workdir", dest="workdir", default=".", help="Working directory with clLucas binary, default current")
 
-(options, args) = parser.parse_args()
+options = parser.parse_args()
 
-progname = os.path.basename(sys.argv[0])
 workdir = os.path.expanduser(options.workdir)
 
 workfile = os.path.join(workdir, "worktodo.txt")
 
-resultsfile = os.path.join(workdir, "result.txt")
+resultsfile = os.path.join(workdir, "results.txt")
 
 # A cumulative backup
-sentfile = os.path.join(workdir, "result_sent.txt")
+sentfile = os.path.join(workdir, "results_sent.txt")
 
 workpattern = r"(DoubleCheck|Test)=.*(,[0-9]+){3}"
 
 # mersenne.org limit is about 4 KB; stay on the safe side
 sendlimit = 3500
 
-if options.nonet:
-    options.num_cache = 0
-    get_assignment()
-    sys.exit()
-
-# Make nonet faster by deferring these
-import cookielib
-import urllib2
-import urllib
-from time import sleep
-
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
 primenet_cj = cookielib.CookieJar()
 primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
 
-try:
-    # Log in to primenet
-    login_data = {"user_login": options.username,
-                  "user_password": options.password,
-              }
+primenet_login = False
+
+# Assuming clLucas in the workdir, could be generalized for any path
+# and alternatives like CudaLucas...
+binary = os.path.join(workdir, "clLucas")
     
-    # This makes a POST instead of GET
-    data = urllib.urlencode(login_data)
-    r = primenet.open(primenet_baseurl + "default.php", data)
+while True:
+    work = network_getwork()
     
-    if not options.username + "<br>logged in" in r.read():
-        primenet_login = False
-        debug_print("Login failed.")
+    if len(work) == 0:
+        print("Out of work")
+        break
     else:
-        primenet_login = True
-
-        # The order is important, because we check resultsfile for
-        # finished work when handling workfile
-        for f in [get_assignment, submit_work]:
-            while f() == "locked":
-                debug_print("Waiting for file access...")
-                sleep(2)
-
-except urllib2.URLError:
-    debug_print("Primenet URL open error")
+        worklist = [binary] + fft_opt(work) + options.cllopts.split() + [work]
+        
+    # Run clLucas in the foreground
+    ecode = os.spawnvp(os.P_WAIT, worklist[0], worklist)
+    
+    if ecode != 0:
+        print("Worker error")
+        break

@@ -1,0 +1,44 @@
+llloop.py
+---------
+
+Automatic work assignment and submission script for clLucas (and
+possibly CUDALucas).
+
+Similarly to mfloop.py, this script aims to submit completed work,
+found in result.txt, to Primenet, and fetch new work into
+worktodo.txt. One essential difference, though, is that clLucas takes
+the work as a command line parameter, rather than reading the file. So
+this script also parses the assignment and runs clLucas with the
+necessary parameters.
+
+While clLucas only takes one exponent at a time, this script allows
+you to cache more assignments in worktodo.txt, using the -n
+option, so it can provide more work even during network outages.
+
+The network/file operations and clLucas are done in a sequential loop
+ad infinitum. You can finish current work by setting -n 0.
+
+Naturally, since clLucas does not touch worktodo.txt, this script
+clears assignments from the file, once completed.
+
+By default, llloop.py fetches double-checking work, but you can also
+select first-time LL work with -T 100 or 102. The reason for the
+default choice is mainly because clLucas and this script are rather
+experimental, compared to the mainstream GIMPS software.
+
+GPU72.com is currently not supported, as LL work is not available
+there. Should the situation change, it would be trivial to add here,
+as the functionality already exists in mfloop.py.
+
+
+llloop.sh
+---------
+
+A simple Unix shell wrapper for llloop.py -- please edit for your
+login information, hardware and other preferences.
+
+
+More on clLucas
+---------------
+
+http://www.mersenneforum.org/showthread.php?t=18297
