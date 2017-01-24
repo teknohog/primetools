@@ -23,8 +23,8 @@ import math
 from optparse import OptionParser
 
 
-primenet_baseurl = "http://www.mersenne.org/"
-gpu72_baseurl = "http://www.gpu72.com/"
+primenet_baseurl = "https://www.mersenne.org/"
+gpu72_baseurl = "https://www.gpu72.com/"
 
 def ass_generate(assignment):
     output = ""
