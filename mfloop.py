@@ -21,6 +21,7 @@ import os
 import urllib
 import math
 from optparse import OptionParser
+from datetime import datetime
 
 
 primenet_baseurl = "https://www.mersenne.org/"
@@ -97,11 +98,11 @@ def ghzd_topup(l, ghdz_target):
 
                     percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
                     bit_ghzd *= 1 - percent_done
-                    debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
+                    debug_print(str(str(datetime.now())) + " " + "Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
 
             ghzd_existing += bit_ghzd
 
-    debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
+    debug_print(str(str(datetime.now())) + " " + "Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
     return max(0, math.ceil(ghdz_target - ghzd_existing))
 
@@ -170,7 +171,7 @@ def primenet_fetch(num_to_get):
         r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
         return exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
     except urllib2.URLError:
-        debug_print("URL open error at primenet_fetch")
+        debug_print(str(datetime.now()) + " " + "URL open error at primenet_fetch")
         return []
 
 def gpu72_fetch(num_to_get, ghzd_to_get = 0):
@@ -224,7 +225,7 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
         return list(set(new_tasks))
 
     except urllib2.URLError:
-        debug_print("URL open error at gpu72_fetch")
+        debug_print(str(datetime.now()) + " " + "URL open error at gpu72_fetch")
 
     return []
 
@@ -247,20 +248,20 @@ def get_assignment():
         num_to_get = num_topup(tasks, int(options.num_cache))
 
     if num_to_get < 1 and ghzd_to_get == 0:
-        debug_print("Cache full, not getting new work")
+        debug_print(str(datetime.now()) + " " + "Cache full, not getting new work")
         # Must write something anyway to clear the lockfile
         new_tasks = []
     else:
         if use_gpu72 and ghzd_to_get > 0:
-            debug_print("Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
+            debug_print(str(datetime.now()) + " " + "Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
             new_tasks = fetch[use_gpu72](num_to_get, ghzd_to_get)
         else:
-            debug_print("Fetching " + str(num_to_get) + " assignments")
+            debug_print(str(datetime.now()) + " " + "Fetching " + str(num_to_get) + " assignments")
             new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
         if use_gpu72 and options.fallback == "1" and num_to_get and len(new_tasks) == 0:
-            debug_print("Error retrieving from gpu72.")
+            debug_print(str(datetime.now()) + " " + "Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
     write_list_file(workfile, new_tasks, "a")
@@ -306,7 +307,7 @@ def submit_work():
     results_keep = filter(lambda x: mersenne_find(x, complete=False), results)
 
     if len(results_send) == 0:
-        debug_print("No complete results found to send.")
+        debug_print(str(datetime.now()) + " " + "No complete results found to send.")
         # Don't just return here, files are still locked...
     else:
         while len(results_send) > 0:
@@ -317,7 +318,7 @@ def submit_work():
 
             data = "\n".join(sendbatch)
 
-            debug_print("Submitting\n" + data)
+            debug_print(str(datetime.now()) + " " + "Submitting\n" + data)
 
             try:
                 post_data = urllib.urlencode({"data": data})
@@ -327,10 +328,10 @@ def submit_work():
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
-                    debug_print("Submission failed.")
+                    debug_print(str(datetime.now()) + " " + "Submission failed.")
             except urllib2.URLError:
                 results_keep += sendbatch
-                debug_print("URL open error")
+                debug_print(str(datetime.now()) + " " + "URL open error")
 
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
@@ -404,18 +405,18 @@ while True:
 
         if not options.username + "<br>logged in" in r.read():
             primenet_login = False
-            debug_print("Login failed.")
+            debug_print(str(datetime.now()) + " " + "Login failed.")
         else:
             primenet_login = True
             while submit_work() == "locked":
-                debug_print("Waiting for results file access...")
+                debug_print(str(datetime.now()) + " " + "Waiting for results file access...")
                 sleep(2)
 
     except urllib2.URLError:
-        debug_print("Primenet URL open error")
+        debug_print(str(datetime.now()) + " " + "Primenet URL open error")
 
     while get_assignment() == "locked":
-        debug_print("Waiting for worktodo.txt access...")
+        debug_print(str(datetime.now()) + " " + "Waiting for worktodo.txt access...")
         sleep(2)
 
     if timeout <= 0:
