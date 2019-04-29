@@ -98,11 +98,11 @@ def ghzd_topup(l, ghdz_target):
 
                     percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
                     bit_ghzd *= 1 - percent_done
-                    debug_print(str(str(datetime.now())) + " " + "Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
+                    debug_print(str(datetime.now()) + " " + "Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
 
             ghzd_existing += bit_ghzd
 
-    debug_print(str(str(datetime.now())) + " " + "Found " + str(ghzd_existing) + " of existing GHz-days of work")
+    debug_print(str(datetime.now()) + " " + "Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
     return max(0, math.ceil(ghdz_target - ghzd_existing))
 
