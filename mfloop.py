@@ -21,6 +21,7 @@ import os
 import urllib
 import math
 from optparse import OptionParser
+from datetime import datetime
 
 
 primenet_baseurl = "https://www.mersenne.org/"
@@ -35,7 +36,7 @@ def ass_generate(assignment):
 
 def debug_print(text):
     if options.debug:
-        print(progname + ": " + text)
+        print(progname + ": " + str(datetime.now()) + " " + text)
 
 def exp_increase(l, max_exp):
     output = []
