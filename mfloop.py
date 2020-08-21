@@ -8,20 +8,20 @@
 # Written with mfakto in mind, this only handles trial factoring work
 # for now. It should work with mfaktc as well.
 
-# This version can run in parallel with the factoring program, as it
-# uses lockfiles to avoid conflicts when updating files.
+# This version can run in parallel with mfakto, as it uses lockfiles
+# to avoid conflicts when updating files.
+
+# Mfaktc does not use lockfiles, so this can only be used when mfaktc
+# is not running, using -t 0 for a single update without looping.
 
 import sys
-import os.path
-import cookielib
-import urllib2
+import http.cookiejar
+import urllib.request, urllib.error, urllib.parse
 import re
-from time import sleep
+import time
 import os
-import urllib
 import math
 from optparse import OptionParser
-
 
 primenet_baseurl = "https://www.mersenne.org/"
 gpu72_baseurl = "https://www.gpu72.com/"
@@ -35,7 +35,7 @@ def ass_generate(assignment):
 
 def debug_print(text):
     if options.debug:
-        print(progname + ": " + text)
+        print(progname + " " + time.strftime("%Y-%m-%d %H:%M") + " " + text)
 
 def exp_increase(l, max_exp):
     output = []
@@ -48,10 +48,16 @@ def exp_increase(l, max_exp):
             output.append(re.sub(r",([0-9]+)$", "," + new_exp, line))
     return output
 
-def greplike(pattern, l):
+def greplike(pattern, l, charset = ""):
     output = []
     for line in l:
-        s = re.search(r"(" + pattern + ")$", line)
+
+        if len(charset) > 0:
+            line_str = line.decode(charset)
+        else:
+            line_str = line
+            
+        s = re.search(r"(" + pattern + ")$", line_str)
         if s:
             output.append(s.groups()[0])
     return output
@@ -129,11 +135,11 @@ def read_list_file(filename):
             File = open(filename, "r")
             contents = File.readlines()
             File.close()
-            return map(lambda x: x.rstrip(), contents)
+            return [x.rstrip() for x in contents]
         else:
             return []
 
-    except OSError, e:
+    except OSError as e:
         if e.errno == 17:
             return "locked"
         else:
@@ -158,18 +164,17 @@ def primenet_fetch(num_to_get):
     if not primenet_login:
         return []
 
-    # Manual assignment settings; trial factoring = 2
-    assignment = {"cores": "1",
-                  "num_to_get": str(num_to_get),
-                  "pref": "2",
+    # Manual assignment settings
+    assignment = {"num_to_get": str(num_to_get),
+                  "pref": options.workpref,
                   "exp_lo": "",
                   "exp_hi": "",
     }
 
     try:
-        r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-        return exp_increase(greplike(workpattern, r.readlines()), int(options.max_exp))
-    except urllib2.URLError:
+        r = primenet.open(primenet_baseurl + "manual_gpu_assignment/?" + ass_generate(assignment))
+        return exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
+    except urllib.error.URLError:
         debug_print("URL open error at primenet_fetch")
         return []
 
@@ -214,16 +219,16 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
     }
 
     # This makes a POST instead of GET
-    data = urllib.urlencode(assignment)
-    req = urllib2.Request(gpu72_baseurl + "account/getassignments/" + gpu72_type + "/", data)
-
+    data = urllib.parse.urlencode(assignment).encode('utf-8')
+    req = urllib.request.Request(gpu72_baseurl + "account/getassignments/" + gpu72_type + "/", data)
+    
     try:
         r = gpu72.open(req)
-        new_tasks = greplike(workpattern, r.readlines())
+        new_tasks = greplike(workpattern, r.readlines(), r.headers.get_content_charset())
         # Remove dupes
         return list(set(new_tasks))
 
-    except urllib2.URLError:
+    except urllib.error.URLError:
         debug_print("URL open error at gpu72_fetch")
 
     return []
@@ -282,8 +287,11 @@ def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
 
+    if not primenet_login:
+        return
+    
     files = [resultsfile, sentfile]
-    rs = map(read_list_file, files)
+    rs = list(map(read_list_file, files))
 
     if "locked" in rs:
         # Remove the lock in case one of these was unlocked at start
@@ -302,8 +310,8 @@ def submit_work():
 
     # Useless lines (not including a M#) are now discarded completely.
 
-    results_send = filter(mersenne_find, results)
-    results_keep = filter(lambda x: mersenne_find(x, complete=False), results)
+    results_send = list(filter(mersenne_find, results))
+    results_keep = [x for x in results if mersenne_find(x, complete=False)]
 
     if len(results_send) == 0:
         debug_print("No complete results found to send.")
@@ -320,15 +328,16 @@ def submit_work():
             debug_print("Submitting\n" + data)
 
             try:
-                post_data = urllib.urlencode({"data": data})
-                r = primenet.open(primenet_baseurl + "manual_result/default.php", post_data)
-                res = r.read()
+                post_data = urllib.parse.urlencode({"data": data}).encode("utf-8")
+                r = primenet.open(primenet_baseurl + "manual_result/", post_data)
+                res = r.read().decode(r.headers.get_content_charset())
+
                 if "processing:" in res or "Accepted" in res:
                     sent += sendbatch
                 else:
                     results_keep += sendbatch
                     debug_print("Submission failed.")
-            except urllib2.URLError:
+            except urllib.error.URLError:
                 results_keep += sendbatch
                 debug_print("URL open error")
 
@@ -359,6 +368,8 @@ parser.add_option("-f", "--fallback", dest="fallback", default="1", help="Fall b
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
+parser.add_option("-W", "--workpref", dest="workpref", default="2", help="Primenet work preference: 2 = double check trial factoring (default), 3 = first time TF, 4 = TF for 100M digit Mersenne numbers")
+
 (options, args) = parser.parse_args()
 
 use_gpu72 = (len(options.guser) > 0)
@@ -381,15 +392,15 @@ workpattern = r"Factor=[^,]*(,[0-9]+){3}"
 sendlimit = 3000
 
 # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-primenet_cj = cookielib.CookieJar()
-primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
+primenet_cj = http.cookiejar.CookieJar()
+primenet = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(primenet_cj))
 
 if use_gpu72:
     # Basic http auth
-    password_mgr = urllib2.HTTPPasswordMgrWithDefaultRealm()
+    password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
     password_mgr.add_password(None, gpu72_baseurl + "account/", options.guser, options.gpass)
-    handler = urllib2.HTTPBasicAuthHandler(password_mgr)
-    gpu72 = urllib2.build_opener(handler)
+    handler = urllib.request.HTTPBasicAuthHandler(password_mgr)
+    gpu72 = urllib.request.build_opener(handler)
 
 while True:
     # Log in to primenet
@@ -399,27 +410,28 @@ while True:
                   }
 
         # This makes a POST instead of GET
-        data = urllib.urlencode(login_data)
-        r = primenet.open(primenet_baseurl + "default.php", data)
+        data = urllib.parse.urlencode(login_data).encode("utf-8")
+        r = primenet.open(primenet_baseurl, data)
+        res = r.read().decode(r.headers.get_content_charset())
 
-        if not options.username + "<br>logged in" in r.read():
-            primenet_login = False
-            debug_print("Login failed.")
-        else:
+        if options.username + "<br>logged in" in res:
             primenet_login = True
             while submit_work() == "locked":
                 debug_print("Waiting for results file access...")
-                sleep(2)
-
-    except urllib2.URLError:
+                time.sleep(2)
+        else:
+            primenet_login = False
+            debug_print("Primenet login failed.")
+                
+    except urllib.error.URLError:
         debug_print("Primenet URL open error")
 
     while get_assignment() == "locked":
         debug_print("Waiting for worktodo.txt access...")
-        sleep(2)
+        time.sleep(2)
 
     if timeout <= 0:
         break
 
-    sleep(timeout)
+    time.sleep(timeout)
 
