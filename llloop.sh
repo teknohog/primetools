@@ -1,18 +1,40 @@
 #!/bin/bash
 
-BASEOPTS="-u prime -p example"
-WORKOPTS="-n 1 -T 101"
+# by teknohog
 
-#CLLOPTS="-d 0 -aggressive -threads 128" # 1.02
-CLLOPTS="-d 0 -polite 0 -threads 128 -sixstepfft" # 1.04
+# Example script for automatic work assignment for clLucas and CUDALucas
 
-cd ~/distr.projects/clLucas.1.04/bin/x86_64/Release
+# https://www.rieselprime.de/ziki/ClLucas
+# https://www.mersenneforum.org/cllucas/
 
-export LD_LIBRARY_PATH=~/sources/clFFT/src/library/
+# https://www.rieselprime.de/ziki/CUDALucas
+# https://sourceforge.net/projects/cudalucas/
 
-# Device numbering as in cgminer
-# GB 7970
-DEVICE=0
-aticonfig --adapter=0 --odsc=1050,1500
+BASEOPTS="-u teknohog -p 11235"
+WORKOPTS="-n 1 -T 100"
 
-llloop.py $BASEOPTS $WORKOPTS -o "$CLLOPTS" $@
+#LLCMD="clLucas -d 0 -aggressive -threads 128" # 1.02
+#LLCMD="clLucas -d 0 -polite 0 -threads 128 -sixstepfft" # 1.04
+#BASEDIR=~/distr.projects/clLucas.1.04/bin/x86_64/Release
+#export LD_LIBRARY_PATH=~/sources/clFFT/src/library/
+
+LLCMD="CUDALucas"
+BASEDIR=~/sources/cudalucas
+
+# GPU workers sometimes hog the CPU needlessly. This is a simple
+# solution, though it would be better to limit the worker process only
+# within llloop.py.
+NICE=5
+
+while getopts f opt; do
+    case $opt in
+	f)
+	    # Finish current work and exit
+	    WORKOPTS="-n 0"
+	;;
+    esac
+done
+
+cd $BASEDIR
+
+nice -n$NICE llloop.py $BASEOPTS $WORKOPTS -c "$LLCMD"

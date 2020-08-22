@@ -2,104 +2,16 @@
 
 # by teknohog
 
-# Automatic assignment handler for clLucas and manual testing at
-# mersenne.org. Should also work with CUDALucas and similar programs
-# with minimal changes.
+# Automatic assignment handler for Lucas-Lehmer primality testing on
+# GPUs. Work is fetched from and submitted to Primenet (mersenne.org),
+# and the LL test is done by programs such as clLucas and CUDALucas.
 
-import sys
-import os.path
-import re
-import os
-
-import cookielib
-import urllib2
-import urllib
-from time import sleep
-
-primenet_baseurl = "http://www.mersenne.org/"
-gpu72_baseurl = "http://www.gpu72.com/"
-
-def ass_generate(assignment):
-    output = ""
-    for key in assignment:
-        output += key + "=" + assignment[key] + "&"
-    #return output.rstrip("&")
-    return output
-
-def cleanup(data):
-    # as in submit_spider; urllib2.quote does not quite work here
-    output = re.sub(" ", "+", data)
-    output = re.sub(":", "%3A", output)
-    output = re.sub(",", "%2C", output)
-    output = re.sub("\n", "%0A", output)
-    return output
-
-def greplike(pattern, l):
-    output = []
-    for line in l:
-        s = re.search(r".*(" + pattern +")$", line)
-        if s:
-            output.append(s.groups()[0])
-    return output
-
-def num_topup(l, targetsize):
-    num_existing = len(l)
-    num_needed = targetsize - num_existing
-    return max(num_needed, 0)
-
-def readonly_file(filename):
-    # Used when there is no intention to write the file back, so don't
-    # check or write lockfiles. Also returns a single string, no list.
-    if os.path.exists(filename):
-        File = open(filename, "r")
-        contents = File.read()
-        File.close()
-    else:
-        contents = ""
-
-    return contents
-
-def read_list_file(filename):
-    # Used when we plan to write the new version, so use locking
-    lockfile = filename + ".lck"
-
-    try:
-        fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
-        os.close(fd)
-
-        if os.path.exists(filename):
-            File = open(filename, "r")
-            contents = File.readlines()
-            File.close()
-            return map(lambda x: x.rstrip(), contents)
-        else:
-            return []
-
-    except OSError, e:
-        if e.errno == 17:
-            return "locked"
-        else:
-            raise
-
-def write_list_file(filename, l, mode="w"):
-    # Assume we put the lock in upon reading the file, so we can
-    # safely write the file and remove the lock
-    lockfile = filename + ".lck"
-
-    # A "null append" is meaningful, as we can call this to clear the
-    # lockfile. In this case the main file need not be touched.
-    if mode != "a" or len(l) > 0:
-        content = "\n".join(l) + "\n"
-        File = open(filename, mode)
-        File.write(content)
-        File.close()
-
-    os.remove(lockfile)
+from primetools import *
 
 def primenet_fetch(num_to_get):
-    global primenet_login
+    global primenet_logged_in
     
-    if not primenet_login:
+    if not primenet_logged_in:
         return []
 
     # <option value="102">World record tests
@@ -113,10 +25,10 @@ def primenet_fetch(num_to_get):
     }
     
     try:
-        r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment) + "B1=Get+Assignments")
-        return greplike(workpattern, r.readlines())
+        r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment))
+        return greplike(workpattern, r.readlines(), r.headers.get_content_charset())
     except urllib2.URLError:
-        print("URL open error at primenet_fetch")
+        print_status("URL open error at primenet_fetch")
         return []
 
 def get_assignment():
@@ -128,14 +40,14 @@ def get_assignment():
     tasks_keep = []
 
     # If the work is finished, remove it from tasks
-    tasks = filter(unfinished, tasks)
+    tasks = list(filter(unfinished, tasks))
 
     num_to_get = num_topup(tasks, options.num_cache)
 
     if num_to_get < 1:
-        print("Cache full, not getting new work")
+        print_status("Cache full, not getting new work")
     else:
-        print("Fetching " + str(num_to_get) + " assignments")
+        print_status("Fetching " + str(num_to_get) + " assignments")
         tasks += primenet_fetch(num_to_get)
 
     # Output work for cllucas
@@ -170,8 +82,8 @@ def submit_work():
     # sentfile.
 
     files = [resultsfile, sentfile]
-    rs = map(read_list_file, files)
-
+    rs = list(map(read_list_file, files))
+  
     if "locked" in rs:
         # Remove the lock in case one of these was unlocked at start
         for i in range(len(files)):
@@ -182,100 +94,18 @@ def submit_work():
 
     results = rs[0]
 
-    # Only for new results, to be appended to sentfile
-    sent = []
-
     # Example: M( 110503 )P, n = 6144, clLucas v1.00
     results_send = greplike(r"M\( ([0-9]*) \).*", results)
+    
+    (sent, unsent) = primenet_submit(results_send)
 
-    results_keep = []
-
-    # Use the textarea form to submit several results at once.
-
-    if len(results_send) == 0:
-        print("No complete results found to send.")
-        # Don't just return here, files are still locked...
-    else:
-        while len(results_send) > 0:
-            sendbatch = []
-            while sum(map(len, sendbatch)) < sendlimit and \
-                  len(results_send) > 0:
-                sendbatch.append(results_send.pop(0))
-
-            data = "\n".join(sendbatch)
-        
-            print("Submitting\n" + data)
-
-            try:
-                r = primenet.open(primenet_baseurl + "manual_result/default.php?data=" + cleanup(data) + "&B1=Submit")
-                if "processing:" in r.read():
-                    sent += sendbatch
-                else:
-                    results_keep += sendbatch
-                    print("Submission failed.")
-            except urllib2.URLError:
-                results_keep += sendbatch
-                print("URL open error")
-
-    write_list_file(resultsfile, results_keep)
+    write_list_file(resultsfile, unsent)
     write_list_file(sentfile, sent, "a")
 
-def fft_opt(m):
-    # Optimal FFT size for clLucas
-    
-    if int(m) > 38000000:
-	fft = 4096
-    else:
-	fft = 2048
-
-    # clLucas 1.04 has automatic size incrementing. This script can
-    # still be useful for finding more optimal values, but in the
-    # meantime, start with something basic.
-    fft = 2048
-        
-    # Format for clLucas
-    return ["-f", str(fft) + "K"]
-
-def network_getwork():
-    global options, primenet, primenet_baseurl, primenet_login
-
-    mersenne = ""
-    
-    try:
-        # Log in to primenet
-        login_data = {"user_login": options.username,
-                      "user_password": options.password,
-                  }
-        
-        # This makes a POST instead of GET
-        data = urllib.urlencode(login_data)
-        r = primenet.open(primenet_baseurl + "default.php", data)
-
-        primenet_login = options.username + "<br>logged in" in r.read()
-
-        # The order of get_assignment, then submit_work is important,
-        # because we check resultsfile for finished work when handling
-        # workfile. clLucas does not use lockfiles, so in the present
-        # form we can ignore them.
-
-        # This doesn't require login as it also gets tasks from the
-        # file cache.
-        mersenne = get_assignment()
-        
-        if primenet_login:
-            submit_work()
-        else:
-            print("Login failed.")
-
-    except urllib2.URLError:
-        print("Primenet URL open error")
-
-    return mersenne
-        
 import argparse
 parser = argparse.ArgumentParser()
 
-parser.add_argument("-o", "--cllopts", help="CLLucas options in a single string, e.g. '-d 0 -polite 0 -threads 128 -sixstepfft'")
+parser.add_argument("-c", "--llcmd", help="LL command in a single string without the Mersenne exponent, e.g. 'clLucas -f 2048K -d 0 -polite 0 -threads 128 -sixstepfft'")
 
 parser.add_argument("-u", "--username", dest="username", required=True, help="Primenet user name")
 parser.add_argument("-p", "--password", dest="password", required=True, help="Primenet password")
@@ -298,31 +128,37 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 
 workpattern = r"(DoubleCheck|Test)=.*(,[0-9]+){3}"
 
-# mersenne.org limit is about 4 KB; stay on the safe side
-sendlimit = 3500
+workcmd = options.llcmd.split()
 
-# adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-primenet_cj = cookielib.CookieJar()
-primenet = urllib2.build_opener(urllib2.HTTPCookieProcessor(primenet_cj))
+# If no full path is given for the worker, assume it is relative to
+# the workdir. Not sure how this would work outside Unix :-/
+if workcmd[0][0] != "/":
+    workcmd[0] = os.path.join(workdir, workcmd[0])
 
-primenet_login = False
-
-# Assuming clLucas in the workdir, could be generalized for any path
-# and alternatives like CudaLucas...
-binary = os.path.join(workdir, "clLucas")
-    
 while True:
-    work = network_getwork()
+    primenet_logged_in = primenet_login(primenet, options)
+
+    # The order of get_assignment, then submit_work is important,
+    # because we check resultsfile for finished work when handling
+    # workfile. clLucas does not use lockfiles, so in the present form
+    # we can ignore them.
+    
+    # This doesn't require login as it also gets tasks from the file
+    # cache.
+    work = get_assignment()
+    
+    if primenet_logged_in:
+        submit_work()
     
     if len(work) == 0:
-        print("Out of work")
+        print_status("Out of work")
         break
-    else:
-        worklist = [binary] + fft_opt(work) + options.cllopts.split() + [work]
+
+    worklist = workcmd + [work]
         
-    # Run clLucas in the foreground
+    # Run worker in the foreground
     ecode = os.spawnvp(os.P_WAIT, worklist[0], worklist)
     
     if ecode != 0:
-        print("Worker error")
+        print_status("Worker error")
         break
