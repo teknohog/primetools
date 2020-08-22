@@ -14,28 +14,7 @@
 # Mfaktc does not use lockfiles, so this can only be used when mfaktc
 # is not running, using -t 0 for a single update without looping.
 
-import sys
-import http.cookiejar
-import urllib.request, urllib.error, urllib.parse
-import re
-import time
-import os
-import math
-from optparse import OptionParser
-
-primenet_baseurl = "https://www.mersenne.org/"
-gpu72_baseurl = "https://www.gpu72.com/"
-
-def ass_generate(assignment):
-    output = ""
-    for key in assignment:
-        output += key + "=" + assignment[key] + "&"
-    #return output.rstrip("&")
-    return output
-
-def debug_print(text):
-    if options.debug:
-        print(progname + " " + time.strftime("%Y-%m-%d %H:%M") + " " + text)
+from primetools import *
 
 def exp_increase(l, max_exp):
     output = []
@@ -47,25 +26,6 @@ def exp_increase(l, max_exp):
             new_exp = str(max(exp, max_exp))
             output.append(re.sub(r",([0-9]+)$", "," + new_exp, line))
     return output
-
-def greplike(pattern, l, charset = ""):
-    output = []
-    for line in l:
-
-        if len(charset) > 0:
-            line_str = line.decode(charset)
-        else:
-            line_str = line
-            
-        s = re.search(r"(" + pattern + ")$", line_str)
-        if s:
-            output.append(s.groups()[0])
-    return output
-
-def num_topup(l, targetsize):
-    num_existing = len(l)
-    num_needed = targetsize - num_existing
-    return max(num_needed, 0)
 
 def ghzd_topup(l, ghdz_target):
     ghzd_existing = 0.0
@@ -103,65 +63,17 @@ def ghzd_topup(l, ghdz_target):
 
                     percent_done = float(checkpoint_pieces[progress_index]) / float(checkpoint_pieces[3])
                     bit_ghzd *= 1 - percent_done
-                    debug_print("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
+                    print_status("Found checkpoint file for assignment M"+str(exponent)+" indicating "+str(round(percent_done*100,2))+"% done.")
 
             ghzd_existing += bit_ghzd
 
-    debug_print("Found " + str(ghzd_existing) + " of existing GHz-days of work")
+    print_status("Found " + str(ghzd_existing) + " of existing GHz-days of work")
 
     return max(0, math.ceil(ghdz_target - ghzd_existing))
 
-def readonly_file(filename):
-    # Used when there is no intention to write the file back, so don't
-    # check or write lockfiles. Also returns a single string, no list.
-    if os.path.exists(filename):
-        File = open(filename, "r")
-        contents = File.read()
-        File.close()
-    else:
-        contents = ""
-
-    return contents
-
-def read_list_file(filename):
-    # Used when we plan to write the new version, so use locking
-    lockfile = filename + ".lck"
-
-    try:
-        fd = os.open(lockfile, os.O_CREAT | os.O_EXCL)
-        os.close(fd)
-
-        if os.path.exists(filename):
-            File = open(filename, "r")
-            contents = File.readlines()
-            File.close()
-            return [x.rstrip() for x in contents]
-        else:
-            return []
-
-    except OSError as e:
-        if e.errno == 17:
-            return "locked"
-        else:
-            raise
-
-def write_list_file(filename, l, mode="w"):
-    # Assume we put the lock in upon reading the file, so we can
-    # safely write the file and remove the lock
-    lockfile = filename + ".lck"
-
-    # A "null append" is meaningful, as we can call this to clear the
-    # lockfile. In this case the main file need not be touched.
-    if mode != "a" or len(l) > 0:
-        content = "\n".join(l) + "\n"
-        File = open(filename, mode)
-        File.write(content)
-        File.close()
-
-    os.remove(lockfile)
 
 def primenet_fetch(num_to_get):
-    if not primenet_login:
+    if not primenet_logged_in:
         return []
 
     # Manual assignment settings
@@ -175,7 +87,7 @@ def primenet_fetch(num_to_get):
         r = primenet.open(primenet_baseurl + "manual_gpu_assignment/?" + ass_generate(assignment))
         return exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
     except urllib.error.URLError:
-        debug_print("URL open error at primenet_fetch")
+        print_status("URL open error at primenet_fetch")
         return []
 
 def gpu72_fetch(num_to_get, ghzd_to_get = 0):
@@ -229,7 +141,7 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
         return list(set(new_tasks))
 
     except urllib.error.URLError:
-        debug_print("URL open error at gpu72_fetch")
+        print_status("URL open error at gpu72_fetch")
 
     return []
 
@@ -252,20 +164,20 @@ def get_assignment():
         num_to_get = num_topup(tasks, int(options.num_cache))
 
     if num_to_get < 1 and ghzd_to_get == 0:
-        debug_print("Cache full, not getting new work")
+        print_status("Cache full, not getting new work")
         # Must write something anyway to clear the lockfile
         new_tasks = []
     else:
         if use_gpu72 and ghzd_to_get > 0:
-            debug_print("Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
+            print_status("Fetching " + str(ghzd_to_get) + " GHz-days of assignments")
             new_tasks = fetch[use_gpu72](num_to_get, ghzd_to_get)
         else:
-            debug_print("Fetching " + str(num_to_get) + " assignments")
+            print_status("Fetching " + str(num_to_get) + " assignments")
             new_tasks = fetch[use_gpu72](num_to_get)
 
         # Fallback to primenet in case of problems
         if use_gpu72 and options.fallback == "1" and num_to_get and len(new_tasks) == 0:
-            debug_print("Error retrieving from gpu72.")
+            print_status("Error retrieving from gpu72.")
             new_tasks = fetch[not use_gpu72](num_to_get)
 
     write_list_file(workfile, new_tasks, "a")
@@ -287,7 +199,7 @@ def submit_work():
     # Only submit completed work, i.e. the exponent must not exist in
     # worktodo.txt any more
 
-    if not primenet_login:
+    if not primenet_logged_in:
         return
     
     files = [resultsfile, sentfile]
@@ -303,48 +215,19 @@ def submit_work():
 
     results = rs[0]
 
-    # Only for new results, to be appended to results_sent
-    sent = []
-
-    # Use the textarea form to submit several results at once.
-
     # Useless lines (not including a M#) are now discarded completely.
 
     results_send = list(filter(mersenne_find, results))
     results_keep = [x for x in results if mersenne_find(x, complete=False)]
 
-    if len(results_send) == 0:
-        debug_print("No complete results found to send.")
-        # Don't just return here, files are still locked...
-    else:
-        while len(results_send) > 0:
-            sendbatch = []
-            while sum(map(len, sendbatch)) < sendlimit and \
-                  len(results_send) > 0:
-                sendbatch.append(results_send.pop(0))
+    (sent, unsent) = primenet_submit(results_send)
 
-            data = "\n".join(sendbatch)
-
-            debug_print("Submitting\n" + data)
-
-            try:
-                post_data = urllib.parse.urlencode({"data": data}).encode("utf-8")
-                r = primenet.open(primenet_baseurl + "manual_result/", post_data)
-                res = r.read().decode(r.headers.get_content_charset())
-
-                if "processing:" in res or "Accepted" in res:
-                    sent += sendbatch
-                else:
-                    results_keep += sendbatch
-                    debug_print("Submission failed.")
-            except urllib.error.URLError:
-                results_keep += sendbatch
-                debug_print("URL open error")
-
+    results_keep += unsent
+    
     write_list_file(resultsfile, results_keep)
     write_list_file(sentfile, sent, "a")
 
-
+from optparse import OptionParser
 parser = OptionParser()
 
 parser.add_option("-d", "--debug", action="store_true", dest="debug", default=False, help="Display debugging info")
@@ -372,9 +255,15 @@ parser.add_option("-W", "--workpref", dest="workpref", default="2", help="Primen
 
 (options, args) = parser.parse_args()
 
+# Default to silent output, as this is intended to run in the
+# background of a worker, and it might clutter the display.
+#if not options.debug:
+#    print_status = lambda x: None
+# Hmm... this does not apply to primetools functions that call it :-/
+# So comment out for now, but leave the option for compatibility.
+
 use_gpu72 = (len(options.guser) > 0)
 
-progname = os.path.basename(sys.argv[0])
 workdir = os.path.expanduser(options.workdir)
 timeout = int(options.timeout)
 
@@ -388,13 +277,6 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 # Trial factoring
 workpattern = r"Factor=[^,]*(,[0-9]+){3}"
 
-# mersenne.org limit is about 4 KB; stay on the safe side
-sendlimit = 3000
-
-# adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-primenet_cj = http.cookiejar.CookieJar()
-primenet = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(primenet_cj))
-
 if use_gpu72:
     # Basic http auth
     password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -403,31 +285,15 @@ if use_gpu72:
     gpu72 = urllib.request.build_opener(handler)
 
 while True:
-    # Log in to primenet
-    try:
-        login_data = {"user_login": options.username,
-                      "user_password": options.password,
-                  }
+    primenet_logged_in = primenet_login(primenet, options)
 
-        # This makes a POST instead of GET
-        data = urllib.parse.urlencode(login_data).encode("utf-8")
-        r = primenet.open(primenet_baseurl, data)
-        res = r.read().decode(r.headers.get_content_charset())
-
-        if options.username + "<br>logged in" in res:
-            primenet_login = True
-            while submit_work() == "locked":
-                debug_print("Waiting for results file access...")
-                time.sleep(2)
-        else:
-            primenet_login = False
-            debug_print("Primenet login failed.")
-                
-    except urllib.error.URLError:
-        debug_print("Primenet URL open error")
-
+    if primenet_logged_in:
+        while submit_work() == "locked":
+            print_status("Waiting for results file access...")
+            time.sleep(2)
+    
     while get_assignment() == "locked":
-        debug_print("Waiting for worktodo.txt access...")
+        print_status("Waiting for worktodo.txt access...")
         time.sleep(2)
 
     if timeout <= 0:
