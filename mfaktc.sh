@@ -50,7 +50,7 @@ if $FLUSH; then
     $LOOP $BASEOPTS -n 0 -t 0
 else
     while true; do
-	$LOOP $BASEOPTS -t 0
+	$LOOP $BASEOPTS $WORKOPTS -t 0
 	./$FACT -d $DEVICE
 	
 	# Some wait time is useful in case of errors
