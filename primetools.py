@@ -1,7 +1,8 @@
 # by teknohog
 
 # Common functions for primetools such as mfloop.py and llloop.py. Put
-# this in the same directory with the main Python scripts.
+# this in the same directory with the main Python scripts; it should
+# not have executable permissions.
 
 import sys
 import http.cookiejar
@@ -11,15 +12,7 @@ import time
 import os
 import math
 
-primenet_baseurl = "https://www.mersenne.org/"
 gpu72_baseurl = "https://www.gpu72.com/"
-
-# mersenne.org limit is about 4 KB; stay on the safe side
-sendlimit = 3000
-
-# adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
-primenet_cj = http.cookiejar.CookieJar()
-primenet = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(primenet_cj))
 
 def ass_generate(assignment):
     output = ""
@@ -100,64 +93,77 @@ def write_list_file(filename, l, mode="w"):
 
     os.remove(lockfile)
 
-def primenet_login(primenet, options):
-    try:
-        login_data = {"user_login": options.username,
-                      "user_password": options.password,
-                  }
+class PrimeNet():
+    def __init__(self, options):
+        self.baseurl = "https://www.mersenne.org/"
 
-        # This makes a POST instead of GET
-        data = urllib.parse.urlencode(login_data).encode("utf-8")
-        r = primenet.open(primenet_baseurl, data)
-        res = r.read().decode(r.headers.get_content_charset())
+        # mersenne.org limit is about 4 KB; stay on the safe side
+        self.sendlimit = 3000
 
-        if options.username + "<br>logged in" in res:
-            print_status("Logged in to Primenet")
-            return True
-        else:
-            print_status("Primenet login failed")
-            return False
+        # adapted from http://stackoverflow.com/questions/923296/keeping-a-session-in-python-while-making-http-requests
+        self.cookiejar = http.cookiejar.CookieJar()
+        self.opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(self.cookiejar))
+
+        self.login_data = {"user_login": options.username,
+                           "user_password": options.password,
+        }
+
+        self.workpref = options.workpref
+        
+    def login(self):
+        try:
+            # This makes a POST instead of GET
+            data = urllib.parse.urlencode(self.login_data).encode("utf-8")
+            r = self.opener.open(self.baseurl, data)
+            res = r.read().decode(r.headers.get_content_charset())
             
-    except urllib.error.URLError:
-        print_status("Primenet URL open error")
-        return False
+            if self.login_data["user_login"] + "<br>logged in" in res:
+                print_status("Logged in to Primenet")
+                self.logged_in = True
+            else:
+                print_status("Primenet login failed")
+                self.logged_in = False
+            
+        except urllib.error.URLError:
+            print_status("Primenet URL open error")
+            self.logged_in = False
+        
+    def submit(self, results):
+        # Copy the list so we can pop() it freely without changing the original
+        sendlist = list(results)
 
-def primenet_submit(results):
-    # Copy the list so we can pop() it freely without changing the original
-    sendlist = list(results)
-
-    # Keep track of succesful and failed sends
-    sent = []
-    unsent = []
+        # Keep track of succesful and failed sends
+        sent = []
+        unsent = []
     
-    # Use the textarea form to submit several results at once. Due to
-    # sendlimit, a large set of results is split into batches that are
-    # sent separately.
+        # Use the textarea form to submit several results at once. Due
+        # to sendlimit, a large set of results is split into batches
+        # that are sent separately.
     
-    if len(sendlist) == 0:
-        print_status("No complete results found to send.")
-    else:
-        while len(sendlist) > 0:
-            sendbatch = []
-            while sum(map(len, sendbatch)) <= sendlimit and len(sendlist) > 0:
-                sendbatch.append(sendlist.pop(0))
+        if len(sendlist) == 0:
+            print_status("No complete results found to send.")
+        else:
+            while len(sendlist) > 0:
+                sendbatch = []
+                while sum(map(len, sendbatch)) <= self.sendlimit and len(sendlist) > 0:
+                    sendbatch.append(sendlist.pop(0))
 
-            data = "\n".join(sendbatch)
+                data = "\n".join(sendbatch)
 
-            print_status("Submitting\n" + data)
+                print_status("Submitting\n" + data)
 
-            try:
-                post_data = urllib.parse.urlencode({"data": data}).encode("utf-8")
-                r = primenet.open(primenet_baseurl + "manual_result/", post_data)
-                res = r.read().decode(r.headers.get_content_charset())
+                try:
+                    post_data = urllib.parse.urlencode({"data": data}).encode("utf-8")
+                    r = self.opener.open(self.baseurl + "manual_result/", post_data)
+                    res = r.read().decode(r.headers.get_content_charset())
                 
-                if "processing:" in res or "Accepted" in res:
-                    sent += sendbatch
-                else:
+                    if "processing:" in res or "Accepted" in res:
+                        sent += sendbatch
+                    else:
+                        unsent += sendbatch
+                        print_status("Submission failed.")
+                except urllib.error.URLError:
                     unsent += sendbatch
-                    print_status("Submission failed.")
-            except urllib.error.URLError:
-                unsent += sendbatch
-                print_status("URL open error")
+                    print_status("URL open error")
 
-    return (sent, unsent)
+        return (sent, unsent)

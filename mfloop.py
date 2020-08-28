@@ -71,25 +71,6 @@ def ghzd_topup(l, ghdz_target):
 
     return max(0, math.ceil(ghdz_target - ghzd_existing))
 
-
-def primenet_fetch(num_to_get):
-    if not primenet_logged_in:
-        return []
-
-    # Manual assignment settings
-    assignment = {"num_to_get": str(num_to_get),
-                  "pref": options.workpref,
-                  "exp_lo": "",
-                  "exp_hi": "",
-    }
-
-    try:
-        r = primenet.open(primenet_baseurl + "manual_gpu_assignment/?" + ass_generate(assignment))
-        return exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
-    except urllib.error.URLError:
-        print_status("URL open error at primenet_fetch")
-        return []
-
 def gpu72_fetch(num_to_get, ghzd_to_get = 0):
     if options.gpu72_type == "dctf":
         gpu72_type = "dctf"
@@ -151,7 +132,7 @@ def get_assignment():
         return "locked"
 
     fetch = {True: gpu72_fetch,
-             False: primenet_fetch,
+             False: primenet.fetch_tf,
          }
 
     tasks = greplike(workpattern, w)
@@ -195,37 +176,56 @@ def mersenne_find(line, complete=True):
     else:
         return False
 
-def submit_work():
-    # Only submit completed work, i.e. the exponent must not exist in
-    # worktodo.txt any more
+class PrimeNet_TF(PrimeNet):
+    def fetch_tf(self, num_to_get):
+        if not self.logged_in:
+            return []
 
-    if not primenet_logged_in:
-        return
+        # Manual assignment settings
+        assignment = {"num_to_get": str(num_to_get),
+                      "pref": self.workpref,
+                      "exp_lo": "",
+                      "exp_hi": "",
+        }
+
+        try:
+            r = self.opener.open(self.baseurl + "manual_gpu_assignment/?" + ass_generate(assignment))
+            return exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
+        except urllib.error.URLError:
+            print_status("URL open error at primenet fetch_tf")
+            return []
+
+    def submit_tf(self):
+        # Only submit completed work, i.e. the exponent must not exist in
+        # worktodo.txt any more
+
+        if not self.logged_in:
+            return
     
-    files = [resultsfile, sentfile]
-    rs = list(map(read_list_file, files))
+        files = [resultsfile, sentfile]
+        rs = list(map(read_list_file, files))
 
-    if "locked" in rs:
-        # Remove the lock in case one of these was unlocked at start
-        for i in range(len(files)):
-            if rs[i] != "locked":
-                write_list_file(files[i], [], "a")
+        if "locked" in rs:
+            # Remove the lock in case one of these was unlocked at start
+            for i in range(len(files)):
+                if rs[i] != "locked":
+                    write_list_file(files[i], [], "a")
 
-        return "locked"
+            return "locked"
 
-    results = rs[0]
+        results = rs[0]
 
-    # Useless lines (not including a M#) are now discarded completely.
+        # Useless lines (not including a M#) are now discarded completely.
 
-    results_send = list(filter(mersenne_find, results))
-    results_keep = [x for x in results if mersenne_find(x, complete=False)]
+        results_send = list(filter(mersenne_find, results))
+        results_keep = [x for x in results if mersenne_find(x, complete=False)]
 
-    (sent, unsent) = primenet_submit(results_send)
-
-    results_keep += unsent
+        (sent, unsent) = self.submit(results_send)
+        
+        results_keep += unsent
     
-    write_list_file(resultsfile, results_keep)
-    write_list_file(sentfile, sent, "a")
+        write_list_file(resultsfile, results_keep)
+        write_list_file(sentfile, sent, "a")
 
 from optparse import OptionParser
 parser = OptionParser()
@@ -277,6 +277,8 @@ sentfile = os.path.join(workdir, "results_sent.txt")
 # Trial factoring
 workpattern = r"Factor=[^,]*(,[0-9]+){3}"
 
+primenet = PrimeNet_TF(options)
+
 if use_gpu72:
     # Basic http auth
     password_mgr = urllib.request.HTTPPasswordMgrWithDefaultRealm()
@@ -285,10 +287,10 @@ if use_gpu72:
     gpu72 = urllib.request.build_opener(handler)
 
 while True:
-    primenet_logged_in = primenet_login(primenet, options)
-
-    if primenet_logged_in:
-        while submit_work() == "locked":
+    primenet.login()
+    
+    if primenet.logged_in:
+        while primenet.submit_tf() == "locked":
             print_status("Waiting for results file access...")
             time.sleep(2)
     

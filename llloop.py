@@ -8,29 +8,6 @@
 
 from primetools import *
 
-def primenet_fetch(num_to_get):
-    global primenet_logged_in
-    
-    if not primenet_logged_in:
-        return []
-
-    # <option value="102">World record tests
-    # <option value="100">Smallest available first-time tests
-    # <option value="101">Double-check tests
-    assignment = {"cores": "1",
-                  "num_to_get": str(num_to_get),
-                  "pref": options.worktype,
-                  "exp_lo": "",
-                  "exp_hi": "",
-    }
-    
-    try:
-        r = primenet.open(primenet_baseurl + "manual_assignment/?" + ass_generate(assignment))
-        return greplike(workpattern, r.readlines(), r.headers.get_content_charset())
-    except urllib2.URLError:
-        print_status("URL open error at primenet_fetch")
-        return []
-
 def get_assignment():
     w = read_list_file(workfile)
     if w == "locked":
@@ -48,7 +25,7 @@ def get_assignment():
         print_status("Cache full, not getting new work")
     else:
         print_status("Fetching " + str(num_to_get) + " assignments")
-        tasks += primenet_fetch(num_to_get)
+        tasks += primenet.fetch(num_to_get)
 
     # Output work for cllucas
     if len(tasks) > 0:
@@ -75,32 +52,54 @@ def unfinished(line):
     else:
         return True
 
-def submit_work():
-    # There is no concept of incomplete results, as in mfloop.py, so
-    # we simply send every sensible line in resultsfile. But only
-    # delete after a succesful send, and even those are backed up to
-    # sentfile.
+class PrimeNet_LL(PrimeNet):
+    def fetch_ll(self, num_to_get):
+        if not self.logged_in:
+            return []
 
-    files = [resultsfile, sentfile]
-    rs = list(map(read_list_file, files))
-  
-    if "locked" in rs:
-        # Remove the lock in case one of these was unlocked at start
-        for i in range(len(files)):
-            if rs[i] != "locked":
-                write_list_file(files[i], [], "a")
-                
-        return "locked"
-
-    results = rs[0]
-
-    # Example: M( 110503 )P, n = 6144, clLucas v1.00
-    results_send = greplike(r"M\( ([0-9]*) \).*", results)
+        # <option value="102">World record tests
+        # <option value="100">Smallest available first-time tests
+        # <option value="101">Double-check tests
+        assignment = {"cores": "1",
+                      "num_to_get": str(num_to_get),
+                      "pref": self.workpref,
+                      "exp_lo": "",
+                      "exp_hi": "",
+        }
     
-    (sent, unsent) = primenet_submit(results_send)
+        try:
+            r = self.opener.open(self.baseurl + "manual_assignment/?" + ass_generate(assignment))
+            return greplike(workpattern, r.readlines(), r.headers.get_content_charset())
+        except urllib2.URLError:
+            print_status("URL open error at primenet fetch_ll")
+            return []
 
-    write_list_file(resultsfile, unsent)
-    write_list_file(sentfile, sent, "a")
+    def submit_ll(self):
+        # There is no concept of incomplete results, as in mfloop.py, so
+        # we simply send every sensible line in resultsfile. But only
+        # delete after a succesful send, and even those are backed up to
+        # sentfile.
+
+        files = [resultsfile, sentfile]
+        rs = list(map(read_list_file, files))
+  
+        if "locked" in rs:
+            # Remove the lock in case one of these was unlocked at start
+            for i in range(len(files)):
+                if rs[i] != "locked":
+                    write_list_file(files[i], [], "a")
+                
+            return "locked"
+
+        results = rs[0]
+
+        # Example: M( 110503 )P, n = 6144, clLucas v1.00
+        results_send = greplike(r"M\( ([0-9]*) \).*", results)
+    
+        (sent, unsent) = self.submit(results_send)
+
+        write_list_file(resultsfile, unsent)
+        write_list_file(sentfile, sent, "a")
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -112,7 +111,7 @@ parser.add_argument("-p", "--password", dest="password", required=True, help="Pr
 
 parser.add_argument("-n", "--num_cache", type=int, default=1, help="Number of assignments to cache, default %(default)d")
 # -t is reserved for timeout as in mfloop.py, although not currently used here
-parser.add_argument("-T", "--worktype", dest="worktype", default="101", help="Worktype code, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
+parser.add_argument("-T", "--workpref", dest="workpref", default="101", help="Work type preference, default %(default)s for DC, alternatively 100 or 102 for first-time LL")
 parser.add_argument("-w", "--workdir", dest="workdir", default=".", help="Working directory with clLucas binary, default current")
 
 options = parser.parse_args()
@@ -135,8 +134,10 @@ workcmd = options.llcmd.split()
 if workcmd[0][0] != "/":
     workcmd[0] = os.path.join(workdir, workcmd[0])
 
+primenet = PrimeNet_LL(options)
+    
 while True:
-    primenet_logged_in = primenet_login(primenet, options)
+    primenet.login()
 
     # The order of get_assignment, then submit_work is important,
     # because we check resultsfile for finished work when handling
@@ -147,8 +148,8 @@ while True:
     # cache.
     work = get_assignment()
     
-    if primenet_logged_in:
-        submit_work()
+    if primenet.logged_in:
+        primenet.submit_ll()
     
     if len(work) == 0:
         print_status("Out of work")
