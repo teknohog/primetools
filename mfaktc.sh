@@ -17,7 +17,8 @@ BASEDIR=~/sources/mfaktc-0.21
 FACT="mfaktc.exe"
 
 #BASEOPTS="-u teknohog -p 12345 -d"
-#WORKOPTS="-n 1"
+#WORKOPTS="-n 1" # Default double-check TF
+#WORKOPTS="-n 1 -W 3" # First time TF
 
 # Prefer gpu72.com work assignments; 72 is hardcoded minimum, but a
 # lower -e still works for the Primenet fallback
@@ -27,9 +28,13 @@ WORKOPTS="-n 1 -e 72"
 # Defaults
 DEVICE=0
 FLUSH=false
+ONESHOT=false
 
-while getopts d:f opt; do
+while getopts 1d:f opt; do
     case $opt in
+	1)
+	    ONESHOT=true
+	    ;;
 	d)
 	    DEVICE=$OPTARG
 	    ;;
@@ -43,6 +48,12 @@ cd $BASEDIR
 
 # mfloop.py lockfiles may be left over after crashes
 rm *.txt.lck
+
+if $ONESHOT; then
+    # 2020-09-02 Fetch, process and send one batch of work
+    $LOOP $BASEOPTS $WORKOPTS -t 0
+    FLUSH=true
+fi
 
 if $FLUSH; then
     # Complete current work and submit results only at the end
