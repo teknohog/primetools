@@ -251,7 +251,7 @@ parser.add_option("-f", "--fallback", dest="fallback", default="1", help="Fall b
 
 parser.add_option("-t", "--timeout", dest="timeout", default="3600", help="Seconds to wait between network updates, default 3600. Use 0 for a single update without looping.")
 
-parser.add_option("-W", "--workpref", dest="workpref", default="2", help="Primenet work preference: 2 = double check trial factoring (default), 3 = first time TF, 4 = TF for 100M digit Mersenne numbers")
+parser.add_option("-W", "--workpref", dest="workpref", default="1", help="Primenet work preference: 1 = let Primenet decide (default), 2 = double check trial factoring, 3 = first time TF, 4 = TF for 100M digit Mersenne numbers")
 
 (options, args) = parser.parse_args()
 

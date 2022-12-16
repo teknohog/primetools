@@ -17,7 +17,7 @@ BASEDIR=~/sources/mfaktc-0.21
 FACT="mfaktc.exe"
 
 #BASEOPTS="-u teknohog -p 12345 -d"
-#WORKOPTS="-n 1" # Default double-check TF
+#WORKOPTS="-n 1" # Default: let Primenet decide
 #WORKOPTS="-n 1 -W 3" # First time TF
 
 # Prefer gpu72.com work assignments; 72 is hardcoded minimum, but a
