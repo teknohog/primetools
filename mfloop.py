@@ -77,6 +77,9 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
     else:
         gpu72_type = "lltf"
 
+    low = 0
+    high = 10000000000
+
     if options.gpu72_option == "lowest_tf_level":
         option = "1"
     elif options.gpu72_option == "highest_tf_level":
@@ -89,12 +92,22 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
         option = "5"
     elif gpu72_type == "lltf" and options.gpu72_option == "lhm_bit_first":
         option = "6"
+        low = 332000000
+        high = 333000000
     elif gpu72_type == "lltf" and options.gpu72_option == "lhm_depth_first":
         option = "7"
+        low = 332000000
+        high = 333000000
     elif options.gpu72_option == "let_gpu72_decide":
         option = "9"
     else:
         option = "0"
+
+    if options.low != 0:
+        low = options.low
+
+    if options.high != 10000000000:
+        high = options.high
 
     if ghzd_to_get > 0:
         num_to_get_str = "0"
@@ -105,8 +118,8 @@ def gpu72_fetch(num_to_get, ghzd_to_get = 0):
 
     assignment = {"Number": num_to_get_str,
                   "GHzDays": ghzd_to_get_str,
-                  "Low": "0",
-                  "High": "10000000000",
+                  "Low": low,
+                  "High": high,
                   "Pledge": str(max(70, int(options.max_exp))),
                   "Option": option,
     }
@@ -237,6 +250,9 @@ parser.add_option("-e", "--exp", dest="max_exp", default="72", help="Upper limit
 parser.add_option("-T", "--gpu72type", dest="gpu72_type", default="lltf", help="GPU72 type of work, lltf or dctf, default lltf.")
 
 parser.add_option("-o", "--gpu72option", dest="gpu72_option", default="what_makes_sense", help="GPU72 Option to fetch, default what_makes_sense. Other valid values are lowest_tf_level, highest_tf_level, lowest_exponent, oldest_exponent, no_p1_done (dctf only), lhm_bit_first (lltf only), lhm_depth_first (lltf only), and let_gpu72_decide (let_gpu72_decide may override max_exp).")
+
+parser.add_option("-L", "--low", dest="low", default=0, help="Lower bound of exponent range.")
+parser.add_option("-H", "--high", dest="high", default=10000000000, help="Higher bound of exponent range.")
 
 parser.add_option("-u", "--username", dest="username", help="Primenet user name")
 parser.add_option("-p", "--password", dest="password", help="Primenet password")
