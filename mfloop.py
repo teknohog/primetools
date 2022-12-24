@@ -199,6 +199,8 @@ class PrimeNet_TF(PrimeNet):
                       "pref": self.workpref,
                       "exp_lo": "",
                       "exp_hi": "",
+                      "pref2": "1",
+                      "B1": "1",
         }
 
         try:
