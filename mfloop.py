@@ -194,21 +194,44 @@ class PrimeNet_TF(PrimeNet):
         if not self.logged_in:
             return []
 
-        # Manual assignment settings
-        assignment = {"num_to_get": str(num_to_get),
-                      "pref": self.workpref,
-                      "exp_lo": "",
-                      "exp_hi": "",
-                      "pref2": "1",
-                      "B1": "1",
-        }
+        # Try manual GPU assignments first, then CPU assignments as a backup
 
-        try:
-            r = self.opener.open(self.baseurl + "manual_gpu_assignment/?" + ass_generate(assignment))
-            return exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
-        except urllib.error.URLError:
-            print_status("URL open error at primenet fetch_tf")
-            return []
+        assignments = {}
+        
+        assignments["gpu"] = {
+            "num_to_get": str(num_to_get),
+            "pref": self.workpref,
+            "exp_lo": "",
+            "exp_hi": "",
+            "pref2": "1",
+            "B1": "1",
+        } 
+
+        # The pref is fixed to 2 for trial factoring, as the set of
+        # options is somewhat different from GPU assignments
+        assignments["cpu"] = {
+            "cores": "1",
+            "num_to_get": str(num_to_get),
+            "pref": "2",
+            "exp_lo": "",
+            "exp_hi": "",
+        }
+        
+        urls = {"gpu": "manual_gpu_assignment", "cpu": "manual_assignment"}
+
+        for key in ["gpu", "cpu"]:
+            url = self.baseurl + urls[key] + "/?" + ass_generate(assignments[key])
+                
+            try:
+                r = self.opener.open(url)
+                work = exp_increase(greplike(workpattern, r.readlines(), r.headers.get_content_charset()), int(options.max_exp))
+                
+                if len(work) > 0:
+                    return work
+            except urllib.error.URLError:
+                print_status("URL open error at " + url)
+
+        return []
 
     def submit_tf(self):
         # Only submit completed work, i.e. the exponent must not exist in
