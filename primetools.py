@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 # by teknohog
 
 # Common functions for primetools such as mfloop.py and llloop.py. Put
