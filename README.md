@@ -1,3 +1,13 @@
+Warning
+=======
+
+As of 2025-01-01, mersenne.org no longer accepts results from these
+scripts, due to updated data formats. I have no plans to fix this,
+since a vastly improved and up-to-date fork already exists. So please
+consider this repository for historical reference only, and switch to
+AutoPrimeNet for production use: https://github.com/tdulcet/AutoPrimeNet
+
+
 primetools
 ==========
 
